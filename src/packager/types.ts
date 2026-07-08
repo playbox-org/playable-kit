@@ -6,7 +6,7 @@ import {
 } from '../types'
 
 export interface PackagerOptions {
-  /** Path to Cocos web-mobile build output directory */
+  /** Path to a web build output directory (any engine; must contain index.html) */
   buildDir: string
   /** Output directory for packaged files */
   outputDir: string

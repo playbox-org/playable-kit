@@ -199,7 +199,7 @@ describe('validator-forbidden string enforcement', () => {
       templateVariables: { assetTitle: 'candivore-carousel-of-seasons' },
     })
     const out = result.results[0]
-    expect(out.error).toBeFalsy()
+    expect((out as { error?: string }).error).toBeFalsy()
     const zip = await JSZip.loadAsync(readFileSync(out.outputPath))
     const htmlEntries = Object.keys(zip.files).filter((f) =>
       f.endsWith('.html'),

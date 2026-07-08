@@ -88,7 +88,7 @@ describe('base122 codec', () => {
 describe('emitBase122Decoder (browser JS)', () => {
   // The loader emits a JS decoder string; it must be bit-compatible with the TS
   // encodeBase122 (they are an encoder/decoder pair, run in different runtimes).
-  function makeDecoder(): (s: string) => Uint8Array {
+  function makeDecoder(): (s: string, n?: number) => Uint8Array {
     const win: any = {}
 
     new Function('window', emitBase122Decoder())(win)

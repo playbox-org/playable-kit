@@ -654,8 +654,9 @@ export async function packageForNetworks(
       }
 
       options.onProgress?.(networkId, 'done')
-    } catch (error: any) {
-      options.onProgress?.(networkId, 'error', error.message)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      options.onProgress?.(networkId, 'error', message)
       results.push({
         networkId,
         networkName: getNetwork(networkId)?.name || networkId,

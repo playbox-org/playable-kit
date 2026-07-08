@@ -138,3 +138,14 @@ export interface DeployResult {
   projectName: string
   timestamp: number
 }
+
+/** File kind inside a packaged network artifact (spec §4 `files[].kind`). */
+export type ArtifactFileKind = 'html' | 'zip' | 'launcher' | 'payload'
+
+/** One static validation check over a packaged artifact (spec §3/§4). */
+export interface CheckResult {
+  id: string
+  label: string
+  status: 'passed' | 'warning' | 'failed'
+  details: string | null
+}

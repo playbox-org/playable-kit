@@ -38,3 +38,16 @@ export {
   validateAxonEvents,
 } from './validation/axon-events'
 export type { AxonCheck, AxonUsage } from './validation/axon-events'
+export {
+  summarizeChecks,
+  validateArtifact,
+} from './validation/validate-artifact'
+export type {
+  ArtifactFileCheckInput,
+  ValidateArtifactInput,
+} from './validation/validate-artifact'
+export {
+  MIN_SAFE_LOADER_VERSION,
+  scanLoaderHealth,
+} from './validation/loader-health'
+export type { LoaderCheck } from './validation/loader-health'

@@ -6,11 +6,10 @@
  */
 
 /** Public package name shown in the banner. */
-export const PACKAGER_NAME = '@playbox-org/plbx-cocos-assistant'
+export const PACKAGER_NAME = '@playbox-ai/playable-kit'
 
 /** GitHub origin link logged on its own line (clickable in devtools). */
-export const PACKAGER_ORIGIN =
-  'https://github.com/playbox-org/plbx-cocos-assistant'
+export const PACKAGER_ORIGIN = 'https://github.com/playbox-org/playbox-platform'
 
 /**
  * Normalize a version string to a single `v` prefix.

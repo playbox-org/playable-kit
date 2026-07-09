@@ -268,11 +268,9 @@ describe('startup version banner', () => {
       packagerVersion: '0.2.3',
     })
     const html = readFileSync(result.results[0].outputPath, 'utf-8')
-    expect(html).toContain('@playbox-org/plbx-cocos-assistant')
+    expect(html).toContain('@playbox-ai/playable-kit')
     expect(html).toContain('v0.2.3')
-    expect(html).toContain(
-      'https://github.com/playbox-org/plbx-cocos-assistant',
-    )
+    expect(html).toContain('https://github.com/playbox-org/playbox-platform')
   })
 })
 

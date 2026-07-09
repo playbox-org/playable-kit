@@ -6,20 +6,18 @@ import {
 } from '../../src/packager/version-banner'
 
 describe('version-banner', () => {
-  it('exposes the assistant name and GitHub origin', () => {
-    expect(PACKAGER_NAME).toBe('@playbox-org/plbx-cocos-assistant')
+  it('exposes the kit name and GitHub origin', () => {
+    expect(PACKAGER_NAME).toBe('@playbox-ai/playable-kit')
     expect(PACKAGER_ORIGIN).toBe(
-      'https://github.com/playbox-org/plbx-cocos-assistant',
+      'https://github.com/playbox-org/playbox-platform',
     )
   })
 
   it('builds a console.log banner with name, origin and v-prefixed version', () => {
     const banner = buildVersionBanner('0.2.3')
     expect(banner).toContain('console.log')
-    expect(banner).toContain('@playbox-org/plbx-cocos-assistant')
-    expect(banner).toContain(
-      'https://github.com/playbox-org/plbx-cocos-assistant',
-    )
+    expect(banner).toContain('@playbox-ai/playable-kit')
+    expect(banner).toContain('https://github.com/playbox-org/playbox-platform')
     expect(banner).toContain('v0.2.3')
   })
 

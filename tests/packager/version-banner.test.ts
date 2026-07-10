@@ -9,7 +9,7 @@ describe('version-banner', () => {
   it('exposes the kit name and GitHub origin', () => {
     expect(PACKAGER_NAME).toBe('@playbox-ai/playable-kit')
     expect(PACKAGER_ORIGIN).toBe(
-      'https://github.com/playbox-org/playbox-platform',
+      'https://github.com/playbox-org/playable-kit',
     )
   })
 
@@ -17,7 +17,7 @@ describe('version-banner', () => {
     const banner = buildVersionBanner('0.2.3')
     expect(banner).toContain('console.log')
     expect(banner).toContain('@playbox-ai/playable-kit')
-    expect(banner).toContain('https://github.com/playbox-org/playbox-platform')
+    expect(banner).toContain('https://github.com/playbox-org/playable-kit')
     expect(banner).toContain('v0.2.3')
   })
 

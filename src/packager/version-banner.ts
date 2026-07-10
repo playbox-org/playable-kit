@@ -9,7 +9,7 @@
 export const PACKAGER_NAME = '@playbox-ai/playable-kit'
 
 /** GitHub origin link logged on its own line (clickable in devtools). */
-export const PACKAGER_ORIGIN = 'https://github.com/playbox-org/playbox-platform'
+export const PACKAGER_ORIGIN = 'https://github.com/playbox-org/playable-kit'
 
 /**
  * Normalize a version string to a single `v` prefix.

@@ -270,7 +270,7 @@ describe('startup version banner', () => {
     const html = readFileSync(result.results[0].outputPath, 'utf-8')
     expect(html).toContain('@playbox-ai/playable-kit')
     expect(html).toContain('v0.2.3')
-    expect(html).toContain('https://github.com/playbox-org/playbox-platform')
+    expect(html).toContain('https://github.com/playbox-org/playable-kit')
   })
 })
 

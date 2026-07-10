@@ -67,18 +67,23 @@
   ],
   "author": "Playbox Platform <hello@plbx.ai>",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/playbox-org/playable-kit.git"
+  },
   "dependencies": {
     "cheerio": "^1.0.0",
     "clean-css": "^5.3.0",
     "jszip": "^3.10.0"
   },
   "devDependencies": {
-    "@repo/eslint-config": "workspace:*",
+    "@eslint/js": "^9.39.1",
     "@types/clean-css": "^4.2.11",
     "@types/node": "^20.14.0",
     "eslint": "^9.39.1",
     "tsup": "^8.3.0",
     "typescript": "^5.5.0",
+    "typescript-eslint": "^8.15.0",
     "vitest": "^2.1.0"
   },
   "engines": {

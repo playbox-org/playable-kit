@@ -8,6 +8,9 @@ export {
   resolveSplashLogoDataUrl,
 } from './packager/packager'
 export type { PackagerOptions, PackagerResult } from './packager/types'
+export { resolveTemplate } from './packager/template-resolver'
+export { buildOutputRows } from './packager/output-listing'
+export type { OutputBuildRow, OutputFileStat } from './packager/output-listing'
 export {
   buildLauncher,
   effectiveLauncherBytes,
@@ -30,10 +33,13 @@ export {
   detectHostileMp3,
   detectRiskyAudio,
   hostileMp3Marker,
+  parseHostileMp3Marker,
+  parseRiskyAudioMarker,
   riskyAudioMarker,
 } from './validation/audio-format-check'
 export {
   AXON_EVENTS,
+  AXON_SPEC_URL,
   extractAxonUsage,
   validateAxonEvents,
 } from './validation/axon-events'

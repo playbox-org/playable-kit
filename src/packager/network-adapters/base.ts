@@ -279,6 +279,14 @@ export class BaseAdapter implements NetworkAdapter {
   }
 
   getForbiddenStrings(): string[] {
+    // Non-MRAID networks (Moloco, Facebook, Snapchat, …) run a naive substring
+    // scan over the raw HTML and reject the creative on any `mraid.js` hit —
+    // including inside a JS comment or a dead conditional ("Playable shouldn't
+    // include the 'mraid.js' function"). The emitted loader keeps the token
+    // split (see loader/shared.ts) and drops whole-line comments, but that is
+    // a convention someone can undo; this check turns a silent regression into
+    // a failed build.
+    if (!this.networkConfig.mraid) return ['mraid.js']
     return []
   }
 

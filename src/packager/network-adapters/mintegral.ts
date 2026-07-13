@@ -86,6 +86,6 @@ export class MintegralAdapter extends BaseAdapter {
   // See: https://playturbo.mintegral.com → "Rejected for technical error:
   // Please remove the strings related to 'preview-util.js' from the comments."
   getForbiddenStrings(): string[] {
-    return ['preview-util.js', 'preview-util']
+    return [...super.getForbiddenStrings(), 'preview-util.js', 'preview-util']
   }
 }

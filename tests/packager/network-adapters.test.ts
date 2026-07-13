@@ -359,19 +359,14 @@ describe('Network Adapters', () => {
   })
 
   describe('Forbidden strings API (base)', () => {
-    it('non-Mintegral adapters should return empty forbidden list by default', () => {
-      // Only Mintegral PlayTurbo rejects on "preview-util.js" — other networks
-      // don't have this validator rule, so declaring forbidden strings for
-      // them would false-positive on unrelated customInjectBody content.
-      for (const id of [
-        'applovin',
-        'unity',
-        'facebook',
-        'moloco',
-        'google',
-        'tiktok',
-        'pangle',
-      ]) {
+    it('mraid:false adapters forbid mraid.js — their validators grep the raw HTML', () => {
+      for (const id of ['facebook', 'moloco', 'google', 'tiktok', 'pangle']) {
+        expect(getAdapter(id).getForbiddenStrings()).toContain('mraid.js')
+      }
+    })
+
+    it('MRAID adapters declare no forbidden strings — they must ship mraid.js', () => {
+      for (const id of ['applovin', 'unity']) {
         expect(getAdapter(id).getForbiddenStrings()).toEqual([])
       }
     })

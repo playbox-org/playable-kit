@@ -71,6 +71,25 @@ describe('generatePreviewUtil', () => {
     expect(code).toContain('FbPlayableAd')
   })
 
+  it('should map postMessage("download"/"complete") to vungle CTA/game_end (not window.open)', () => {
+    // Vungle is postMessage-driven, not SDK-global-driven. The packager bridge
+    // must emit exactly these two strings (see network-adapters/base.ts
+    // vungleBridge) and this mock must recognize them the same way the real
+    // Vungle container does, or the local validator lies about CTA/game_end.
+    const code = generatePreviewUtil({
+      networkId: 'vungle',
+      mraid: false,
+      maxSize: 5242880,
+    })
+    expect(code).toContain("'download'")
+    expect(code).toContain('vungle_download')
+    expect(code).toContain("report('cta'")
+    expect(code).toContain("'complete'")
+    expect(code).toContain('vungle_complete')
+    expect(code).toContain("report('game_end'")
+    expect(code).toContain('var _plbxExpectedCta = "vungle_download"')
+  })
+
   describe('mraidMode (adversarial boot harness)', () => {
     const gen = (mraidMode?: string) =>
       generatePreviewUtil({

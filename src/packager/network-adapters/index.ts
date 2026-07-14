@@ -6,6 +6,7 @@ import { MintegralAdapter } from './mintegral'
 import { TikTokAdapter } from './tiktok'
 import { PangleAdapter } from './pangle'
 import { SnapchatAdapter } from './snapchat'
+import { VungleAdapter } from './vungle'
 import { MolocoV2Adapter } from './moloco-v2'
 import { getNetwork } from '../../networks'
 import { NetworkConfig } from '../../types'
@@ -25,6 +26,7 @@ const CUSTOM_ADAPTERS: Record<string, AdapterConstructor> = {
   tiktok: TikTokAdapter,
   pangle: PangleAdapter,
   snapchat: SnapchatAdapter,
+  vungle: VungleAdapter,
 }
 
 export function getAdapter(networkId: string): NetworkAdapter {

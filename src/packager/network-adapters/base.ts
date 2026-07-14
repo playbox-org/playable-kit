@@ -207,6 +207,32 @@ window.open = function(u) {
   )
 }
 
+/**
+ * Vungle / Liftoff Adaptive Creative bridge — postMessage-driven, NOT MRAID
+ * and NOT SDK-global-driven like the other custom bridges above. Vungle
+ * tracks neither `window.open()` nor an empty `game_end`; it wants two
+ * string messages posted to `parent`:
+ *
+ *   - CTA (synchronous, inside the user-gesture `download()` call):
+ *       parent.postMessage('download', '*')
+ *   - Result/endcard (`game_end()`):
+ *       parent.postMessage('complete', '*')
+ *
+ * The store URL is intentionally unused — Vungle consumes the event itself,
+ * not a direct store link, so `download` fires unconditionally. `complete`
+ * is wired through `game_end`, never through the CTA, keeping the two
+ * lifecycle signals independent (one CTA tap must not also close the ad).
+ * Keep in sync with expectedCtaMethod('vungle') and the Vungle preview mock
+ * in preview/sdk-mocks.ts ('download' -> vungle_download, 'complete' ->
+ * vungle_complete).
+ */
+export function vungleBridge(): string {
+  return buildPlbxBridge(
+    `try { parent.postMessage('download', '*'); } catch (e) {}`,
+    `window.plbx_html.game_end = function() { try { parent.postMessage('complete', '*'); } catch (e) {} };`,
+  )
+}
+
 /** Generic fallback bridge */
 export function genericBridge(): string {
   return buildPlbxBridge(`if (url) { window.open(url, "_blank"); }`)

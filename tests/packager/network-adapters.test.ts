@@ -519,6 +519,62 @@ describe('Network Adapters', () => {
     })
   })
 
+  describe('Vungle adapter', () => {
+    it('emits parent.postMessage("download") as the CTA bridge', () => {
+      const adapter = getAdapter('vungle')
+      const builder = new HtmlBuilder(sampleHtml)
+      adapter.transform(builder, defaultConfig)
+      const html = builder.toHtml()
+      expect(html).toContain(`parent.postMessage('download', '*')`)
+    })
+
+    it('emits parent.postMessage("complete") from game_end, not from CTA', () => {
+      const adapter = getAdapter('vungle')
+      const builder = new HtmlBuilder(sampleHtml)
+      adapter.transform(builder, defaultConfig)
+      const html = builder.toHtml()
+      expect(html).toContain(`parent.postMessage('complete', '*')`)
+      // The two postMessage calls must not share the same function body —
+      // otherwise a single CTA tap would also fire game_end, or vice versa.
+      const downloadFn = html.slice(
+        html.indexOf('download: function'),
+        html.indexOf('game_end:'),
+      )
+      expect(downloadFn).not.toContain('complete')
+    })
+
+    it('does NOT use window.open as the CTA implementation (untracked by Vungle)', () => {
+      const adapter = getAdapter('vungle')
+      const builder = new HtmlBuilder(sampleHtml)
+      adapter.transform(builder, defaultConfig)
+      const html = builder.toHtml()
+      expect(html).not.toContain('window.open')
+    })
+
+    it('MUST NOT inject mraid.js or use the mraid bridge (Vungle is non-MRAID)', () => {
+      const adapter = getAdapter('vungle')
+      const builder = new HtmlBuilder(sampleHtml)
+      adapter.transform(builder, defaultConfig)
+      const html = builder.toHtml()
+      expect(html).not.toContain('mraid.open')
+      expect(html).not.toMatch(/src=["']mraid\.js["']/)
+    })
+
+    it('declares mraid.js as forbidden (mraid:false network)', () => {
+      expect(getAdapter('vungle').getForbiddenStrings()).toContain('mraid.js')
+    })
+
+    it('transformed HTML must not contain any forbidden string', () => {
+      const adapter = getAdapter('vungle')
+      const builder = new HtmlBuilder(sampleHtml)
+      adapter.transform(builder, defaultConfig)
+      const html = builder.toHtml()
+      for (const needle of adapter.getForbiddenStrings()) {
+        expect(html, `Vungle HTML leaked "${needle}"`).not.toContain(needle)
+      }
+    })
+  })
+
   describe('Non-MRAID networks without SDK', () => {
     ;['tapjoy', 'smadex', 'rubeex'].forEach((id) => {
       it(`${id} should not inject mraid.js`, () => {

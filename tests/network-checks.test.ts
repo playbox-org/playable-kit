@@ -26,3 +26,27 @@ describe('getNetworkChecks', () => {
     expect(ids.join(',')).toMatch(/game_?ready|gameReady|lifecycle/i)
   })
 })
+
+// Vungle's Adaptive Creative rule is the opposite of Mintegral's: `complete` and the
+// CTA's `download` must NEVER fire together, and completion only reaches the container
+// through the bridge (plbx_html.game_end → parent.postMessage('complete', '*')). The
+// shared hint used to tell every GAME_END_REQUIRED network to call window.gameEnd()
+// "before or alongside the CTA" — for Vungle that is the forbidden move, and the bare
+// global never posts anything.
+describe('game_end hint is network-correct', () => {
+  it('tells Vungle to go through the bridge and to keep complete away from the CTA', () => {
+    const check = getNetworkChecks('vungle', true).find((c) => c.id === 'game_end')
+    expect(check).toBeDefined()
+    expect(check!.hint).toContain('plbx_html.game_end()')
+    expect(check!.hint).toContain('postMessage("complete"')
+    expect(check!.hint).toMatch(/never fire together with the CTA/i)
+    expect(check!.hint).not.toMatch(/alongside the CTA/i)
+  })
+
+  it('leaves the Mintegral hint alone — there gameEnd must precede the CTA', () => {
+    const check = getNetworkChecks('mintegral', true).find((c) => c.id === 'game_end')
+    expect(check).toBeDefined()
+    expect(check!.hint).toContain('window.gameEnd()')
+    expect(check!.hint).toContain('alongside the CTA')
+  })
+})

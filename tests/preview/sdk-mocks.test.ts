@@ -202,3 +202,39 @@ describe('generatePreviewUtil', () => {
     expect(code).toContain("report('cta'")
   })
 })
+
+// A game calling the global window.gameEnd() used to turn Vungle's game_end check green
+// while nothing was ever posted to the container: the global reported game_end directly,
+// and only plbx_html.game_end() posts 'complete'. The preview must exercise the same path
+// production does, or it is a false green.
+describe('Vungle game_end goes through the bridge, not straight to the report', () => {
+  it('routes window.gameEnd() into plbx_html.game_end()', () => {
+    const code = generatePreviewUtil({
+      networkId: 'vungle',
+      mraid: false,
+      maxSize: 5 * 1024 * 1024,
+    })
+    expect(code).toContain('window.plbx_html.game_end()')
+    // The 'complete' postMessage is what the mock turns back into a game_end report.
+    expect(code).toContain(`if (msg === 'complete')`)
+    expect(code).toContain('vungle_complete')
+  })
+
+  it('warns instead of silently passing when the bridge is missing', () => {
+    const code = generatePreviewUtil({
+      networkId: 'vungle',
+      mraid: false,
+      maxSize: 5 * 1024 * 1024,
+    })
+    expect(code).toContain('Vungle would never receive complete')
+  })
+
+  it('leaves other networks reporting game_end directly', () => {
+    const code = generatePreviewUtil({
+      networkId: 'mintegral',
+      mraid: false,
+      maxSize: 5 * 1024 * 1024,
+    })
+    expect(code).toContain(`window.gameEnd = function() { report('game_end', {}); }`)
+  })
+})

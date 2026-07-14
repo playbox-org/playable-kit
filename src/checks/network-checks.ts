@@ -203,10 +203,19 @@ export function getNetworkChecks(
 
   // game_end — required for Mintegral (gameEnd), Vungle (complete event)
   if (GAME_END_REQUIRED.has(networkId)) {
+    // Vungle is the exception: `complete` and the CTA's `download` must NEVER fire
+    // together (Adaptive Creative Dos and Don'ts), which is the opposite of the
+    // Mintegral rule below. It also has to travel through the bridge — a bare
+    // window.gameEnd() would satisfy this checklist while the container never hears
+    // the `complete` postMessage in production.
+    const gameEndHint =
+      networkId === 'vungle'
+        ? 'Call plbx_html.game_end() when the gameplay is complete — it posts parent.postMessage("complete", "*"). Vungle requires this AFTER a good portion of the ad has played, and it must NEVER fire together with the CTA.'
+        : 'Call window.gameEnd() when the gameplay is complete (e.g. level finished, time ran out). This must fire before or alongside the CTA.'
     checks.push({
       id: 'game_end',
       label: 'gameEnd()',
-      hint: 'Call window.gameEnd() when the gameplay is complete (e.g. level finished, time ran out). This must fire before or alongside the CTA.',
+      hint: gameEndHint,
     })
   }
 

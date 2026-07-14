@@ -648,7 +648,20 @@ export function generatePreviewUtil(params: PreviewUtilParams): string {
   };
   window.gameStart = function() { report('game_start', {}); };
   window.gameClose = function() { report('game_close', {}); };
-  window.gameEnd = function() { report('game_end', {}); };
+  window.gameEnd = function() {${
+    networkId === 'vungle'
+      ? `
+    // Vungle hears about completion only through the bridge — plbx_html.game_end()
+    // posts parent.postMessage('complete', '*'), which the mock above reports as
+    // vungle_complete. Reporting game_end directly here would turn the checklist
+    // green while production never signals the container at all.
+    if (window.plbx_html && typeof window.plbx_html.game_end === 'function') {
+      try { window.plbx_html.game_end(); return; } catch (e) {}
+    }
+    report('game_end', { method: 'window.gameEnd', warning: 'plbx_html bridge missing — Vungle would never receive complete' });
+  `
+      : ` report('game_end', {}); `
+  }};
 
   // Signal load complete
   report('preview_loaded', { networkId: '${networkId}' });

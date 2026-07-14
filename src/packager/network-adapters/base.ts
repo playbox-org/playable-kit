@@ -233,7 +233,16 @@ window.open = function(u) {
 export function vungleBridge(): string {
   return buildPlbxBridge(
     `try { parent.postMessage('download', '*'); } catch (e) {}`,
-    `window.plbx_html.game_end = function() { try { parent.postMessage('complete', '*'); } catch (e) {} };`,
+    // Same trap as the MRAID/Facebook bridges: plenty of game CTA dispatchers never
+    // touch plbx_html.download() and just call window.install() or window.open(link)
+    // themselves. Vungle tracks neither — the click would vanish exactly the way it
+    // did before this adapter existed. Route both to the `download` postMessage and
+    // swallow the navigation (an Adaptive Creative must not reach the store itself).
+    // `complete` is deliberately NOT touched here: Vungle forbids download and
+    // complete firing together, so only game_end may send it.
+    `window.install = function() { try { parent.postMessage('download', '*'); } catch (e) {} };
+window.open = function(u) { try { parent.postMessage('download', '*'); } catch (e) {} return null; };
+window.plbx_html.game_end = function() { try { parent.postMessage('complete', '*'); } catch (e) {} };`,
   )
 }
 

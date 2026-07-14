@@ -543,12 +543,45 @@ describe('Network Adapters', () => {
       expect(downloadFn).not.toContain('complete')
     })
 
-    it('does NOT use window.open as the CTA implementation (untracked by Vungle)', () => {
+    it('never navigates to the store itself — window.open is trapped, not used', () => {
       const adapter = getAdapter('vungle')
       const builder = new HtmlBuilder(sampleHtml)
       adapter.transform(builder, defaultConfig)
       const html = builder.toHtml()
-      expect(html).not.toContain('window.open')
+      // Vungle tracks neither window.open nor window.install, and an Adaptive
+      // Creative must not reach the store directly ("Do not use the download event
+      // without user interaction" / no direct store links). So the bridge must not
+      // OPEN anything...
+      expect(html).not.toContain(`window.open(url`)
+      expect(html).not.toContain(`_blank`)
+      // ...but it must still catch the games whose CTA dispatcher bypasses
+      // plbx_html.download() and calls window.open / window.install on its own —
+      // otherwise their click vanishes exactly as it did before this adapter.
+      expect(html).toContain(`window.open = function(u)`)
+      expect(html).toContain(`window.install = function()`)
+    })
+
+    it('routes a bypassing window.open / window.install into the download postMessage', () => {
+      const adapter = getAdapter('vungle')
+      const builder = new HtmlBuilder(sampleHtml)
+      adapter.transform(builder, defaultConfig)
+      const html = builder.toHtml()
+
+      const openFn = html.slice(
+        html.indexOf('window.open = function(u)'),
+        html.indexOf('window.plbx_html.game_end ='),
+      )
+      expect(openFn).toContain(`parent.postMessage('download', '*')`)
+      // The trap must never fire completion: Vungle forbids download and complete
+      // firing together.
+      expect(openFn).not.toContain('complete')
+
+      const installFn = html.slice(
+        html.indexOf('window.install = function()'),
+        html.indexOf('window.open = function(u)'),
+      )
+      expect(installFn).toContain(`parent.postMessage('download', '*')`)
+      expect(installFn).not.toContain('complete')
     })
 
     it('MUST NOT inject mraid.js or use the mraid bridge (Vungle is non-MRAID)', () => {

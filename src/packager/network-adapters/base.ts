@@ -208,8 +208,12 @@ window.open = function(u) {
 }
 
 /**
- * Vungle / Liftoff Adaptive Creative bridge — postMessage-driven, NOT MRAID
- * and NOT SDK-global-driven like the other custom bridges above. Vungle
+ * Vungle (Liftoff MONETIZE) Adaptive Creative bridge — postMessage-driven, NOT
+ * MRAID and NOT SDK-global-driven like the other custom bridges above.
+ *
+ * Not to be confused with the `liftoff` network in the registry: that is Liftoff
+ * Accelerate/DSP, which IS MRAID (`mraid: true`) and must NOT use this bridge.
+ * Vungle
  * tracks neither `window.open()` nor an empty `game_end`; it wants two
  * string messages posted to `parent`:
  *

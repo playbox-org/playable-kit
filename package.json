@@ -1,6 +1,6 @@
 {
   "name": "@playbox-ai/playable-kit",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "Playable-ad packaging, validation, checks and preview SDK for the Playbox platform",
   "type": "module",
   "main": "./dist/index.cjs",

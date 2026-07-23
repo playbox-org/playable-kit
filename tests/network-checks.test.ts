@@ -27,6 +27,29 @@ describe('getNetworkChecks', () => {
   })
 })
 
+// Non-MRAID upload validators (Moloco, Facebook) substring-scan the raw HTML
+// and reject on any 'mraid.js' hit — even in a comment or a conditional. The
+// preview validator surfaces that as a static check for mraid:false networks;
+// MRAID networks legitimately ship the tag, and molocoV2's launcher requires it.
+describe('no_forbidden_literals check', () => {
+  it('exists for non-MRAID networks (moloco, facebook)', () => {
+    for (const id of ['moloco', 'facebook']) {
+      const check = getNetworkChecks(id, false).find(
+        (c) => c.id === 'no_forbidden_literals',
+      )
+      expect(check).toBeDefined()
+      expect(check!.label).toContain('mraid.js')
+    }
+  })
+
+  it('is absent for MRAID networks and molocoV2', () => {
+    const applovin = getNetworkChecks('applovin', true).map((c) => c.id)
+    expect(applovin).not.toContain('no_forbidden_literals')
+    const molocoV2 = getNetworkChecks('molocoV2', true).map((c) => c.id)
+    expect(molocoV2).not.toContain('no_forbidden_literals')
+  })
+})
+
 // Vungle's Adaptive Creative rule is the opposite of Mintegral's: `complete` and the
 // CTA's `download` must NEVER fire together, and completion only reaches the container
 // through the bridge (plbx_html.game_end → parent.postMessage('complete', '*')). The

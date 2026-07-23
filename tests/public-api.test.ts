@@ -22,6 +22,9 @@ const REQUIRED_EXPORTS = [
   'parseRiskyAudioMarker',
   'parseHostileMp3Marker',
   'AXON_SPEC_URL',
+  // added in 0.3.5 — consumed by plbx-cocos-extension (preview validator's
+  // static no_forbidden_literals check)
+  'findForbiddenLiterals',
 ] as const
 
 describe('public API barrel', () => {

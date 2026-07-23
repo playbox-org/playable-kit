@@ -41,6 +41,23 @@ function formatBytes(n: number): string {
 }
 
 /**
+ * Forbidden string literals actually present in the built HTML — the same
+ * naive substring scan network upload validators run (see
+ * BaseAdapter.getForbiddenStrings; e.g. Moloco rejects a creative on any
+ * `mraid.js` hit, even inside a comment or a conditional). Returns [] for
+ * unknown networks.
+ */
+export function findForbiddenLiterals(
+  networkId: string,
+  html: string,
+): string[] {
+  if (!getNetwork(networkId)) return []
+  return getAdapter(networkId)
+    .getForbiddenStrings()
+    .filter((s) => html.includes(s))
+}
+
+/**
  * Static validation of one packaged network artifact → flat CheckResult[]
  * (spec §3 "validation" module). Composes the per-network static checks the
  * Cocos extension runs in its Validate window: size limits per file kind,
@@ -80,9 +97,7 @@ export function validateArtifact(input: ValidateArtifactInput): CheckResult[] {
   if (html !== null) {
     const adapter = getAdapter(input.networkId)
 
-    const forbidden = adapter
-      .getForbiddenStrings()
-      .filter((s) => html.includes(s))
+    const forbidden = findForbiddenLiterals(input.networkId, html)
     checks.push({
       id: 'forbidden-strings',
       label: 'No forbidden strings',

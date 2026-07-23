@@ -1,9 +1,30 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  findForbiddenLiterals,
   summarizeChecks,
   validateArtifact,
 } from '../src/validation/validate-artifact'
+
+// Mirrors the naive substring scan Moloco/Facebook moderation runs: any
+// 'mraid.js' occurrence rejects the creative — a JS comment or a conditional
+// like indexOf('mraid.js') counts just as much as a script tag.
+describe('findForbiddenLiterals', () => {
+  it("catches 'mraid.js' in a comment or conditional for non-MRAID networks", () => {
+    const html =
+      '<html><script>// the ad SDK mraid.js case\n' +
+      "if (u.indexOf('mraid.js') !== -1) {}</script></html>"
+    expect(findForbiddenLiterals('moloco', html)).toEqual(['mraid.js'])
+    expect(findForbiddenLiterals('facebook', html)).toEqual(['mraid.js'])
+  })
+
+  it('returns [] for clean html, MRAID networks, and unknown networks', () => {
+    expect(findForbiddenLiterals('moloco', '<html></html>')).toEqual([])
+    const withTag = '<html><script src="mraid.js"></script></html>'
+    expect(findForbiddenLiterals('applovin', withTag)).toEqual([])
+    expect(findForbiddenLiterals('nope', withTag)).toEqual([])
+  })
+})
 
 describe('validateArtifact', () => {
   it('flags unknown networks', () => {

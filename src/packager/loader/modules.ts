@@ -51,6 +51,19 @@ function _deAbout(u, fakeBase) {
   return u;
 }
 
+// _deFile: move a file:// URL onto the fake origin KEEPING ITS WHOLE PATH.
+// 'file:///a/b/cocos-js/cc.js' -> 'https://plbx.local/a/b/cocos-js/cc.js'.
+// Collapsing it to the bare fake base instead would drop every directory
+// segment, and any engine URL algebra rooted at import.meta.url (Cocos does
+// \`new URL('assets/spine-*.wasm', import.meta.url)\` for the Spine runtime)
+// would then miss the cache — whose keys are ZIP paths like
+// 'cocos-js/assets/spine-*.wasm' — and escape to the real network. Keeping the
+// path lets the usual suffix match find it, exactly as it does over http://.
+function _deFile(u, fakeBase) {
+  if (typeof u !== 'string' || u.indexOf('file:') !== 0) return u;
+  return fakeBase + u.slice('file:'.length).replace(/^\\/+/, '');
+}
+
 // Override SystemJS resolve + instantiate + fetch to serve from the in-memory
 // cache. Crucially this is ORIGIN-INDEPENDENT: it resolves against a controlled
 // fake base (https://plbx.local/), never document.baseURI / location, so it
@@ -67,9 +80,10 @@ function plbx_patch_system() {
   var _origResolve = proto.resolve;
   proto.resolve = function (id, parentUrl) {
     var base = parentUrl || _fakeBase;
-    if (base.indexOf('about:') === 0 || base.indexOf('blob:') === 0 || base.indexOf('file:') === 0) base = _fakeBase;
+    if (base.indexOf('about:') === 0 || base.indexOf('blob:') === 0) base = _fakeBase;
+    else base = _deFile(base, _fakeBase);
     try {
-      return _deAbout(_origResolve.call(this, id, base), _fakeBase);
+      return _deFile(_deAbout(_origResolve.call(this, id, base), _fakeBase), _fakeBase);
     } catch (e) {
       var direct = id.replace(/^\\.\\//, '');
       if (_findInJs(direct) || _findInJs(id) || _findAsset(direct) || _findAsset(id)) return id;

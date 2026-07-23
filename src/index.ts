@@ -45,6 +45,7 @@ export {
 } from './validation/axon-events'
 export type { AxonCheck, AxonUsage } from './validation/axon-events'
 export {
+  findForbiddenLiterals,
   summarizeChecks,
   validateArtifact,
 } from './validation/validate-artifact'

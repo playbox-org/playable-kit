@@ -126,6 +126,19 @@ export function getNetworkChecks(
     })
   }
 
+  // Forbidden literals — non-MRAID networks' upload validators (Moloco,
+  // Facebook, …) run a naive substring scan over the raw HTML and reject the
+  // creative on any 'mraid.js' hit, even inside a comment or a conditional.
+  // Evaluated statically against the built HTML server-side
+  // (findForbiddenLiterals / net.forbiddenLiterals).
+  if (!mraid) {
+    checks.push({
+      id: 'no_forbidden_literals',
+      label: "No 'mraid.js' literal in built HTML",
+      hint: "The network's upload validator greps the raw HTML and rejects any 'mraid.js' occurrence — even in a comment or a string check. Builds from older packagers leaked it via the loader; repackage with the current kit.",
+    })
+  }
+
   // Store URL literals — required by networks whose validator greps the raw HTML
   // for them (e.g. Unity Creative Pack). Evaluated statically against the built
   // HTML server-side (see buildStoreUrlPresence / net.hasGooglePlayUrl + hasAppStoreUrl).

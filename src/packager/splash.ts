@@ -59,6 +59,10 @@ export interface SplashOptions {
    * `vmin` (default {@link DEFAULT_LOGO_SCALE}). Ignored without `customLogo` —
    * the PLBX mark keeps its fixed 84px.
    *
+   * Authoritative in both directions: a logo whose intrinsic size is below the
+   * scale is enlarged, not left alone. Callers that surface this should tell the
+   * operator the asset's own pixel size, since scaling far past it looks soft.
+   *
    * `vmin` and not px: a playable fills a container of unknown size, so a fixed
    * px cap that reads well on a phone becomes a speck on a tablet. `vmin` is
    * also the only viewport unit that cannot overflow in EITHER orientation.
@@ -120,13 +124,18 @@ export function buildSplash(opts: SplashOptions = {}): SplashParts {
   let wordmark = ''
   if (customUrl) {
     // Custom client logo: fit any aspect, whole-image pulse, no PLBX wordmark.
-    // Both caps carry the same vmin value — object-fit:contain then picks
-    // whichever side binds, so one scalar works for a square icon and a wide
-    // wordmark alike.
+    //
+    // `width`, not `max-width`: a cap only shrinks, so an asset smaller than the
+    // cap would keep its intrinsic size and the scale would silently stop
+    // responding above it — the complaint that started this was "make the logo
+    // bigger". The scale is the authority on rendered size, in both directions.
+    //
+    // The aspect ratio still survives: `height:auto` derives height from the
+    // width, and `max-height` catches a tall logo — for a replaced element the
+    // constrained height re-derives the width, so nothing stretches.
     const scale = clampLogoScale(opts.logoScale)
     styleCss +=
-      `#lg{max-width:${scale}vmin;max-height:${scale}vmin;` +
-      'width:auto;height:auto;' +
+      `#lg{width:${scale}vmin;height:auto;max-height:${scale}vmin;` +
       'object-fit:contain;animation:pq 1.8s ease infinite}' +
       '@keyframes pq{0%,100%{transform:scale(1)}50%{transform:scale(.9)}}'
     logo = `<img id="lg" src="${customUrl}" alt="">`

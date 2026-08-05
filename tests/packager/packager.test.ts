@@ -55,8 +55,8 @@ describe('custom splash logo size', () => {
       config: { ...logoConfig, splashLogoScale: 64 },
     })
     const html = readFileSync(result.results[0].outputPath, 'utf-8')
-    expect(html).toContain('max-width:64vmin')
-    expect(html).not.toContain('max-width:26vmin')
+    expect(html).toContain('width:64vmin')
+    expect(html).not.toContain('width:26vmin')
   })
 
   it('defaults to 26vmin when the config omits a scale', async () => {
@@ -67,7 +67,7 @@ describe('custom splash logo size', () => {
       config: logoConfig,
     })
     const html = readFileSync(result.results[0].outputPath, 'utf-8')
-    expect(html).toContain('max-width:26vmin')
+    expect(html).toContain('width:26vmin')
   })
 
   it('applies the same scale to every emitted encoding', async () => {
@@ -91,7 +91,7 @@ describe('custom splash logo size', () => {
     expect(htmlFiles.length).toBeGreaterThan(1) // both encodings emitted
     for (const f of htmlFiles) {
       const html = readFileSync(join(outDir, 'applovin', f), 'utf-8')
-      expect(html, `${f} splash scale`).toContain('max-width:71vmin')
+      expect(html, `${f} splash scale`).toContain('width:71vmin')
     }
   })
 })

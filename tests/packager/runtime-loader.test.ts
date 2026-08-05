@@ -294,7 +294,7 @@ describe('generateFullHtml', () => {
       splashLogoDataUrl: 'data:image/png;base64,AAAA',
       splashLogoScale: 62,
     })
-    expect(result).toContain('max-width:62vmin')
+    expect(result).toContain('width:62vmin')
   })
 
   it('defaults the custom-logo scale when splashLogoScale is omitted', () => {
@@ -304,7 +304,7 @@ describe('generateFullHtml', () => {
       showSplash: true,
       splashLogoDataUrl: 'data:image/png;base64,AAAA',
     })
-    expect(result).toContain('max-width:26vmin')
+    expect(result).toContain('width:26vmin')
   })
 
   it('showSplash omitted/false injects nothing splash-related', () => {

@@ -69,25 +69,39 @@ describe('buildSplash custom logo size (logoScale)', () => {
 
   it('defaults to 26vmin — the vmin equivalent of the old fixed 96px', () => {
     const s = css()
-    expect(s).toContain('max-width:26vmin')
+    expect(s).toContain('width:26vmin')
     expect(s).toContain('max-height:26vmin')
     // The fixed px cap is what made wide wordmark logos render tiny.
     expect(s).not.toContain('96px')
   })
 
-  it('sizes both caps from the requested scale', () => {
-    expect(css(55)).toContain('max-width:55vmin')
+  it('sizes the logo from the requested scale', () => {
+    expect(css(55)).toContain('width:55vmin')
     expect(css(55)).toContain('max-height:55vmin')
   })
 
-  it('keeps object-fit:contain so the aspect ratio survives the resize', () => {
-    expect(css(80)).toContain('object-fit:contain')
+  it('sets width, not max-width, so the scale also ENLARGES a small logo', () => {
+    // A shrink-only cap (max-width/max-height) leaves an asset smaller than the
+    // cap at its intrinsic size, so the size control silently stops responding
+    // past that point — the original complaint was "make the logo bigger".
+    const s = css(90)
+    expect(s).toMatch(/[;{]width:90vmin/)
+    expect(s).not.toContain('max-width')
+  })
+
+  it('keeps the aspect ratio: height auto, capped on the cross axis', () => {
+    const s = css(80)
+    // height:auto + max-height keeps a tall logo inside the box; the replaced
+    // element re-derives width from the constrained height, so no stretching.
+    expect(s).toContain('height:auto')
+    expect(s).toContain('max-height:80vmin')
+    expect(s).toContain('object-fit:contain')
   })
 
   it('clamps below 5 up and above 100 down', () => {
-    expect(css(0)).toContain('max-width:5vmin')
-    expect(css(-3)).toContain('max-width:5vmin')
-    expect(css(1e9)).toContain('max-width:100vmin')
+    expect(css(0)).toContain('width:5vmin')
+    expect(css(-3)).toContain('width:5vmin')
+    expect(css(1e9)).toContain('width:100vmin')
   })
 
   it('falls back to the default on a non-finite scale, never emitting NaN', () => {
@@ -102,7 +116,7 @@ describe('buildSplash custom logo size (logoScale)', () => {
   })
 
   it('rounds a fractional scale rather than emitting a long decimal', () => {
-    expect(css(33.333333)).toContain('max-width:33vmin')
+    expect(css(33.333333)).toContain('width:33vmin')
   })
 
   it('leaves the PLBX splash on its fixed 84px mark', () => {

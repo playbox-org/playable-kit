@@ -25,6 +25,16 @@ const REQUIRED_EXPORTS = [
   // added in 0.3.5 — consumed by plbx-cocos-extension (preview validator's
   // static no_forbidden_literals check)
   'findForbiddenLiterals',
+  // added in 0.3.7 — consumed by plbx-cocos-extension (Package tab renders the
+  // real splash markup+CSS in a preview iframe and shows its byte cost, so the
+  // panel never carries a second copy of the splash)
+  'buildSplash',
+  'splashByteCost',
+  'clampLogoScale',
+  'DEFAULT_LOGO_SCALE',
+  'MIN_LOGO_SCALE',
+  'MAX_LOGO_SCALE',
+  'FIRST_FRAME_HOOK_JS',
 ] as const
 
 describe('public API barrel', () => {

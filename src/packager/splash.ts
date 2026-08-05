@@ -54,6 +54,36 @@ export interface SplashOptions {
    * the Moloco launcher (3 KB ceiling).
    */
   customLogo?: { dataUrl: string }
+  /**
+   * Custom-logo size as a percentage of the viewport's SHORTER side, emitted as
+   * `vmin` (default {@link DEFAULT_LOGO_SCALE}). Ignored without `customLogo` —
+   * the PLBX mark keeps its fixed 84px.
+   *
+   * `vmin` and not px: a playable fills a container of unknown size, so a fixed
+   * px cap that reads well on a phone becomes a speck on a tablet. `vmin` is
+   * also the only viewport unit that cannot overflow in EITHER orientation.
+   * Clamped to {@link MIN_LOGO_SCALE}–{@link MAX_LOGO_SCALE}.
+   */
+  logoScale?: number
+}
+
+/** Default custom-logo scale: 26vmin ≈ the 96px this replaced, at 375pt wide. */
+export const DEFAULT_LOGO_SCALE = 26
+/** Below this the logo is effectively invisible. */
+export const MIN_LOGO_SCALE = 5
+/** Above this the logo exceeds the viewport's shorter side. */
+export const MAX_LOGO_SCALE = 100
+
+/**
+ * Clamp a caller-supplied logo scale into a value that is always safe to
+ * interpolate into CSS. Non-finite input (NaN from a parsed empty field,
+ * Infinity from junk settings) falls back to the default: emitting `NaNvmin`
+ * would void the whole declaration and restore the browser default — the
+ * image's intrinsic size, i.e. a potentially full-bleed logo.
+ */
+export function clampLogoScale(n?: number): number {
+  if (typeof n !== 'number' || !Number.isFinite(n)) return DEFAULT_LOGO_SCALE
+  return Math.round(Math.min(MAX_LOGO_SCALE, Math.max(MIN_LOGO_SCALE, n)))
 }
 
 export function buildSplash(opts: SplashOptions = {}): SplashParts {
@@ -90,8 +120,13 @@ export function buildSplash(opts: SplashOptions = {}): SplashParts {
   let wordmark = ''
   if (customUrl) {
     // Custom client logo: fit any aspect, whole-image pulse, no PLBX wordmark.
+    // Both caps carry the same vmin value — object-fit:contain then picks
+    // whichever side binds, so one scalar works for a square icon and a wide
+    // wordmark alike.
+    const scale = clampLogoScale(opts.logoScale)
     styleCss +=
-      '#lg{max-width:96px;max-height:96px;width:auto;height:auto;' +
+      `#lg{max-width:${scale}vmin;max-height:${scale}vmin;` +
+      'width:auto;height:auto;' +
       'object-fit:contain;animation:pq 1.8s ease infinite}' +
       '@keyframes pq{0%,100%{transform:scale(1)}50%{transform:scale(.9)}}'
     logo = `<img id="lg" src="${customUrl}" alt="">`

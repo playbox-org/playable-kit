@@ -932,6 +932,9 @@ export function generateFullHtml(params: {
   /** Client logo data: URL — shown on the splash instead of the PLBX pinwheel +
    *  wordmark. Ignored unless showSplash is set. */
   splashLogoDataUrl?: string
+  /** Client logo size as a % of the viewport's shorter side (vmin). Ignored
+   *  unless splashLogoDataUrl is set; see SplashOptions.logoScale. */
+  splashLogoScale?: number
   /** Asset-container encoding. 'base122' (~14% smaller) only applies to the
    *  self-contained loader; the legacy systemjs path is always base64. */
   encoding?: 'base64' | 'base122'
@@ -1049,7 +1052,10 @@ export function generateFullHtml(params: {
   if (params.showSplash) {
     const splash = buildSplash(
       params.splashLogoDataUrl
-        ? { customLogo: { dataUrl: params.splashLogoDataUrl } }
+        ? {
+            customLogo: { dataUrl: params.splashLogoDataUrl },
+            logoScale: params.splashLogoScale,
+          }
         : {},
     )
     rewrittenHtml = rewrittenHtml.replace(

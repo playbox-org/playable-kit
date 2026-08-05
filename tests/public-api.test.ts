@@ -32,6 +32,9 @@ const REQUIRED_EXPORTS = [
   'splashByteCost',
   'clampLogoScale',
   'DEFAULT_LOGO_SCALE',
+  'MIN_LOGO_SCALE',
+  'MAX_LOGO_SCALE',
+  'FIRST_FRAME_HOOK_JS',
 ] as const
 
 describe('public API barrel', () => {

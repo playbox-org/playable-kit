@@ -2,7 +2,14 @@ import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
 import JSZip from 'jszip'
 import { packageForNetworks } from '../../src/packager/packager'
 import { join } from 'path'
-import { mkdirSync, writeFileSync, existsSync, rmSync, readFileSync } from 'fs'
+import {
+  mkdirSync,
+  writeFileSync,
+  existsSync,
+  rmSync,
+  readFileSync,
+  readdirSync,
+} from 'fs'
 
 const FIXTURES = join(__dirname, '../fixtures')
 const MOCK_BUILD = join(FIXTURES, 'mock-build')
@@ -32,6 +39,62 @@ const defaultConfig = {
   storeUrlAndroid: 'https://play.google.com/store/apps/details?id=com.test',
   orientation: 'portrait' as const,
 }
+
+describe('custom splash logo size', () => {
+  const logoConfig = {
+    ...defaultConfig,
+    showSplash: true,
+    customSplashLogo: join(FIXTURES, 'fake-texture.png'),
+  }
+
+  it('carries config.splashLogoScale into the packaged HTML', async () => {
+    const result = await packageForNetworks({
+      buildDir: MOCK_BUILD,
+      outputDir: join(PACK_OUTPUT, 'scale'),
+      networks: ['applovin'],
+      config: { ...logoConfig, splashLogoScale: 64 },
+    })
+    const html = readFileSync(result.results[0].outputPath, 'utf-8')
+    expect(html).toContain('max-width:64vmin')
+    expect(html).not.toContain('max-width:26vmin')
+  })
+
+  it('defaults to 26vmin when the config omits a scale', async () => {
+    const result = await packageForNetworks({
+      buildDir: MOCK_BUILD,
+      outputDir: join(PACK_OUTPUT, 'scale-default'),
+      networks: ['applovin'],
+      config: logoConfig,
+    })
+    const html = readFileSync(result.results[0].outputPath, 'utf-8')
+    expect(html).toContain('max-width:26vmin')
+  })
+
+  it('applies the same scale to every emitted encoding', async () => {
+    // Two generateFullHtml call sites build the base64 output and its base122
+    // sibling. Threading the scale into only one would silently ship two
+    // differently-sized splashes from a single package run.
+    const outDir = join(PACK_OUTPUT, 'scale-encodings')
+    await packageForNetworks({
+      buildDir: MOCK_BUILD,
+      outputDir: outDir,
+      networks: ['applovin'],
+      config: {
+        ...logoConfig,
+        splashLogoScale: 71,
+        assetEncodings: ['base64', 'base122'],
+      },
+    })
+    const htmlFiles = readdirSync(join(outDir, 'applovin')).filter((f) =>
+      f.endsWith('.html'),
+    )
+    expect(htmlFiles.length).toBeGreaterThan(1) // both encodings emitted
+    for (const f of htmlFiles) {
+      const html = readFileSync(join(outDir, 'applovin', f), 'utf-8')
+      expect(html, `${f} splash scale`).toContain('max-width:71vmin')
+    }
+  })
+})
 
 describe('packageForNetworks', () => {
   it('should package for a single HTML network', async () => {
@@ -211,8 +274,10 @@ describe('validator-forbidden string enforcement', () => {
       .pop()!
     expect(innerBase).toMatch(/^[A-Za-z0-9_]+$/)
     // htmlMatchesZipName: the outer .zip basename must equal the inner HTML base.
+    // Split on both separators — outputPath is an OS path (backslashes on
+    // Windows), unlike the zip's own always-POSIX entry names above.
     const zipBase = out.outputPath
-      .split('/')
+      .split(/[\\/]/)
       .pop()!
       .replace(/\.zip$/, '')
     expect(zipBase).toBe(innerBase)

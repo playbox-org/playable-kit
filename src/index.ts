@@ -21,6 +21,18 @@ export {
 } from './packager/launcher-builder'
 export type { LauncherCheck } from './packager/launcher-builder'
 export { HtmlBuilder } from './packager/html-builder'
+// The loading splash. Exported so a consumer's UI can render the exact markup +
+// CSS that ships in the build (and price it) instead of keeping its own copy.
+export {
+  buildSplash,
+  clampLogoScale,
+  splashByteCost,
+  DEFAULT_LOGO_SCALE,
+  MIN_LOGO_SCALE,
+  MAX_LOGO_SCALE,
+  FIRST_FRAME_HOOK_JS,
+} from './packager/splash'
+export type { SplashOptions, SplashParts } from './packager/splash'
 
 // Validation
 export {

@@ -466,6 +466,7 @@ export async function packageForNetworks(
             loaderMode: effectiveLoaderMode,
             showSplash: options.config.showSplash !== false,
             splashLogoDataUrl,
+            splashLogoScale: options.config.splashLogoScale,
           })
 
           assertNoForbiddenStrings(
@@ -558,6 +559,7 @@ export async function packageForNetworks(
                       loaderMode: effectiveLoaderMode,
                       showSplash: options.config.showSplash !== false,
                       splashLogoDataUrl,
+                      splashLogoScale: options.config.splashLogoScale,
                       encoding: 'base122',
                     })
               if (enc === 'base122') {

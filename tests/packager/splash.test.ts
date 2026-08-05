@@ -62,6 +62,57 @@ describe('buildSplash custom logo', () => {
   })
 })
 
+describe('buildSplash custom logo size (logoScale)', () => {
+  const dataUrl = 'data:image/png;base64,AAAA'
+  const css = (logoScale?: number) =>
+    buildSplash({ customLogo: { dataUrl }, logoScale }).styleCss
+
+  it('defaults to 26vmin — the vmin equivalent of the old fixed 96px', () => {
+    const s = css()
+    expect(s).toContain('max-width:26vmin')
+    expect(s).toContain('max-height:26vmin')
+    // The fixed px cap is what made wide wordmark logos render tiny.
+    expect(s).not.toContain('96px')
+  })
+
+  it('sizes both caps from the requested scale', () => {
+    expect(css(55)).toContain('max-width:55vmin')
+    expect(css(55)).toContain('max-height:55vmin')
+  })
+
+  it('keeps object-fit:contain so the aspect ratio survives the resize', () => {
+    expect(css(80)).toContain('object-fit:contain')
+  })
+
+  it('clamps below 5 up and above 100 down', () => {
+    expect(css(0)).toContain('max-width:5vmin')
+    expect(css(-3)).toContain('max-width:5vmin')
+    expect(css(1e9)).toContain('max-width:100vmin')
+  })
+
+  it('falls back to the default on a non-finite scale, never emitting NaN', () => {
+    // A NaN would kill the whole declaration and restore the browser default
+    // (intrinsic image size → potentially full-bleed logo).
+    for (const bad of [NaN, Infinity, -Infinity]) {
+      const s = css(bad)
+      expect(s).not.toContain('NaN')
+      expect(s).not.toContain('Infinity')
+      expect(s).toContain('vmin')
+    }
+  })
+
+  it('rounds a fractional scale rather than emitting a long decimal', () => {
+    expect(css(33.333333)).toContain('max-width:33vmin')
+  })
+
+  it('leaves the PLBX splash on its fixed 84px mark', () => {
+    // logoScale is a custom-logo control only; the branded splash is untouched.
+    const s = buildSplash({ logoScale: 90 }).styleCss
+    expect(s).toContain('#lg{width:84px;height:84px}')
+    expect(s).not.toContain('vmin')
+  })
+})
+
 describe('splashByteCost with custom logo', () => {
   const url = (rawBytes: number) =>
     'data:image/png;base64,' +

@@ -286,6 +286,27 @@ describe('generateFullHtml', () => {
     )
   })
 
+  it('passes splashLogoScale through to the custom-logo splash CSS', () => {
+    const result = generateFullHtml({
+      originalHtml: sampleHtml,
+      zipBase64: fakeZipBase64,
+      showSplash: true,
+      splashLogoDataUrl: 'data:image/png;base64,AAAA',
+      splashLogoScale: 62,
+    })
+    expect(result).toContain('max-width:62vmin')
+  })
+
+  it('defaults the custom-logo scale when splashLogoScale is omitted', () => {
+    const result = generateFullHtml({
+      originalHtml: sampleHtml,
+      zipBase64: fakeZipBase64,
+      showSplash: true,
+      splashLogoDataUrl: 'data:image/png;base64,AAAA',
+    })
+    expect(result).toContain('max-width:26vmin')
+  })
+
   it('showSplash omitted/false injects nothing splash-related', () => {
     for (const showSplash of [undefined, false] as const) {
       const result = generateFullHtml({

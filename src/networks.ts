@@ -101,8 +101,10 @@ export const NETWORKS: Record<string, NetworkConfig> = {
     id: 'facebook',
     name: 'Facebook/Meta',
     format: 'html',
-    maxSize: MB5, // ZIP total ceiling (<=100 files)
-    htmlMaxSize: MB2, // single-HTML / index.html must be <=2 MB (Meta). Verified 2026-07-01.
+    // 5 MB for both the single HTML and the ZIP total (<=100 files). The old
+    // 2 MB single-HTML figure is obsolete — Meta raised it; kept as one ceiling
+    // so no htmlMaxSize override is needed. Updated 2026-08-20.
+    maxSize: MB5,
     mraid: false,
     inlineAssets: true,
     dualFormat: true,
@@ -300,8 +302,9 @@ export function getNetwork(id: string): NetworkConfig | undefined {
   return NETWORKS[id]
 }
 
-/** Effective size ceiling for a given output format. Networks that cap single-HTML
- *  tighter than their ZIP (e.g. Facebook: 2 MB HTML / 5 MB ZIP) set `htmlMaxSize`. */
+/** Effective size ceiling for a given output format. A network that caps its
+ *  single-HTML output tighter than its ZIP total sets `htmlMaxSize`; with none
+ *  set, `maxSize` governs both. */
 export function maxSizeForFormat(
   net: NetworkConfig,
   format: OutputFormat,

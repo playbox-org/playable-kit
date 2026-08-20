@@ -12,7 +12,7 @@
 
 | Network | CTA Method | MRAID | Size Limit | Format | Lifecycle | Confidence | Source |
 |---------|-----------|-------|-----------|--------|-----------|-----------|--------|
-| **Facebook/Meta** | `FbPlayableAd.onCTAClick()` | No | 2 MB single-HTML / 2 MB index.html in ZIP / **5 MB ZIP total, ≤100 files** | HTML or ZIP | — | high | [Meta](https://developers.facebook.com/docs/app-ads/formats/playable-ad/) |
+| **Facebook/Meta** | `FbPlayableAd.onCTAClick()` | No | **5 MB** single-HTML / **5 MB ZIP total, ≤100 files** | HTML or ZIP | — | high | [Meta](https://developers.facebook.com/docs/app-ads/formats/playable-ad/) |
 | **Moloco** | `FbPlayableAd.onCTAClick()` | No | **< 5 MB, HTML only (ZIP forbidden)** | HTML | — | high | [Moloco](https://help.moloco.com/hc/en-us/articles/24124525963799-Playable-and-Interactive-End-Card-IEC-creative-guide) |
 | **Moloco V2 (Launcher API)** | `mraid.open(final_url)` | MRAID 2.0 | payload < 5 MB; launcher < 3 KB ⚠ partner-spec | launcher + payload | viewableChange + macro beacons | med | [Moloco Cloud](https://developer.moloco.cloud/docs/campaign-management-api) |
 | **Google Ads (App)** | `ExitApi.exit()` | No (MRAID accepted as alt exit) | **5 MB ZIP, ≤512 files, ≤20 ZIPs/ad group** | ZIP | — (sound off till tap) | high | [Google](https://support.google.com/google-ads/answer/9981650) |
@@ -52,7 +52,11 @@ Every size/SDK claim below carries its source URL.
 
 ### Facebook/Meta — `high`
 - **CTA:** `FbPlayableAd.onCTAClick()` — provided by the Meta container at runtime; do NOT bundle an SDK. The validator statically checks the literal call appears in code (error "Missing CTA Click Function Call"). Meta uses it to navigate to the store.
-- **Size:** single HTML ≤ **2 MB**; `index.html` inside a ZIP ≤ **2 MB**; **ZIP total ≤ 5 MB**; **≤ 100 files** in ZIP (>100 rejected). ("uncompressed" is a PlayCanvas characterization, not Meta's wording.) — [Meta](https://developers.facebook.com/docs/app-ads/formats/playable-ad/), [Business Help](https://www.facebook.com/business/help/412951382532338)
+- **Size:** single HTML ≤ **5 MB**; **ZIP total ≤ 5 MB**; **≤ 100 files** in ZIP (>100 rejected).
+  Updated 2026-08-20 from practice: the old **2 MB** single-HTML ceiling is obsolete — Meta raised it.
+  Note that Meta's Business Help page still renders the 2 MB figure in search snippets, so a stale
+  quote is easy to find; treat the 5 MB number as the operative one and re-check before lowering it
+  again. ("uncompressed" is a PlayCanvas characterization, not Meta's wording.) — [Meta](https://developers.facebook.com/docs/app-ads/formats/playable-ad/), [Business Help](https://www.facebook.com/business/help/412951382532338)
 - **MRAID:** No — do not include mraid.js.
 - **Format:** single self-contained `.html` (assets inline data-URI/base64) OR a ZIP with `index.html` at the archive **root**, resources referenced relative to it (e.g. `assets/splash.png`).
 - **Blocked (official):** no JavaScript redirects; **no dynamic asset loading through external network** (officially confirmed). Treat localStorage/sessionStorage as unavailable (sandboxed iframe — widely observed, not in Meta docs).
@@ -381,7 +385,7 @@ Reflects the CURRENT code state as of 2026-07-01. The former `MB4` constant was 
 |---------|---------------|--------|
 | TikTok / Pangle `maxSize` | `MB4` → `MB5` (MB4 const removed) | TikTok Ads Help (5 MB after compression) |
 | Pangle `sdkUrl` | stale `pstatp.com` v3.4.1 → `ibytedtos.com` i18n v3.49.0 (= TikTok) | official Pangle create-playable doc + byte-verified version strings |
-| Facebook `htmlMaxSize` | added `MB2`; validator now enforces per-format (HTML ≤ 2 MB / ZIP ≤ 5 MB) via `maxSizeForFormat()` | Meta playable specs |
+| Facebook `htmlMaxSize` | ~~added `MB2`; per-format HTML ≤ 2 MB~~ — **removed 2026-08-20**: the 2 MB single-HTML cap is obsolete, both formats are 5 MB, so `maxSize` alone governs. `maxSizeForFormat()` stays for any network that does cap HTML tighter | Meta playable specs, updated from practice |
 | Moloco `dualFormat` | `true` → `false` (Moloco forbids ZIP — HTML-only) | Moloco IEC guide |
 | GDT `maxSize` + `sdkUrl` | `MB5` → `MB3`; added `qzs.gdtimg.com/.../unsdk.js` | 优量汇 spec (包大小不大于3M) |
 | Snapchat `mraid` + CTA | `mraid:true` → `false`; `SnapchatAdapter` → `snapchatBridge()` (`ScPlayableAd.onCTAClick()`, no mraid.js) | smoud core.ts + Snap App Playables |

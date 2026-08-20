@@ -4,8 +4,8 @@ Companion to [luna-playworks.md](./luna-playworks.md) (the packaging spec).
 That document says what the packager emits; this one says what the **game
 project** still has to do, and how to verify the result.
 
-Worked example: `Playables/_Prod/train-miner2-c4` (Cocos 3.8, already on the
-`plbx_html` channel). Line numbers refer to that project as of 2026-08-19.
+Examples below are taken from real Cocos 3.8 projects already on the
+`plbx_html` channel, with project-specific names generalised.
 
 ## 1. What the packager already does — do NOT reimplement
 
@@ -29,25 +29,26 @@ Luna wants `Luna.Unity.LifeCycle.GameEnded()` when gameplay is over; the
 packager exposes it as `plbx_html.game_end()`. A project that reaches game-end
 through some other global will simply never fire it, with no error.
 
-In the worked example, `AdPlatformService.gameEnded()` does:
+A typical ad-layer wrapper does:
 
 ```ts
-if (platformType === AdPlatformService.platformTypes.MINTEGRAL || typeof window.gameEnd === 'function') {
+if (platformType === PLATFORM.MINTEGRAL || typeof window.gameEnd === 'function') {
     window.gameEnd && window.gameEnd();
 }
 ```
 
 `window.gameEnd` is defined by nobody in a Luna build, and `platformType` is
 `'luna'` (it comes from `window.super_html_channel`), so **both branches are
-false and GameEnded never fires**. Fix — route through the channel the packager
-actually provides:
+false and GameEnded never fires**. Two separate projects had exactly this shape,
+each keyed off a different legacy global. Fix — route through the channel the
+packager actually provides:
 
 ```ts
 public static gameEnded(): void {
-    if (AdPlatformService.hasGameEnded) return;
-    AdPlatformService.hasGameEnded = true;
+    if (hasGameEnded) return;
+    hasGameEnded = true;
 
-    const { platformType } = AdPlatformService.getAdInfo();
+    const platformType = (window as any).super_html_channel;
 
     // plbx/super_html channel: the packager maps game_end onto whatever the
     // network needs (Luna → Luna.Unity.LifeCycle.GameEnded, Mintegral/Vungle →
@@ -55,7 +56,7 @@ public static gameEnded(): void {
     const plbx = (window as any).plbx_html || (window as any).super_html;
     if (plbx && typeof plbx.game_end === 'function') { plbx.game_end(); return; }
 
-    if (platformType === AdPlatformService.platformTypes.MINTEGRAL || typeof window.gameEnd === 'function') {
+    if (platformType === PLATFORM.MINTEGRAL || typeof window.gameEnd === 'function') {
         window.gameEnd && window.gameEnd();
     }
 }
@@ -87,73 +88,38 @@ Rules that bite:
 - Every unique value creates its own event on Luna's side, so never put a raw
   score or a timestamp in the name.
 
-### 2.3 The playtime funnel (what the client asked for)
+### 2.3 Which events to fire is the project's call
 
-`playtime_10s`, `playtime_20s`, … from the first click, not counting time while
-the container has the ad paused. Drop this file into the project and start it
-where the game registers its first interaction (in the worked example:
-`GameEntryPoint.startLevel()`, next to `AdEvents.Started`).
+The kit ships the channel and the rules; it does not ship events. Concrete
+funnels — playtime, level progression, tutorial steps — belong to the game,
+because only the game knows what its own session looks like.
 
-```ts
-// assets/Scripts/Systems/Ads/LunaPlaytime.ts
-declare const window: any;
-
-/**
- * playtime_10s / playtime_20s / … — one event per 10 s of ACTIVE play, starting
- * at the first interaction. Paused time is not counted: the container fires
- * luna:pause when the ad is backgrounded, and counting through it would inflate
- * the funnel against sessions the user never saw.
- *
- * No cap of its own: Luna allows 256 events per session (and 32 per unique
- * name), which at a 10 s step is 42 minutes — longer than any playable session
- * lives, so an extra ceiling would only add code.
- */
-export class LunaPlaytime {
-    private static readonly STEP_MS = 10_000;
-
-    private static timer: any = null;
-    private static paused = false;
-    private static seconds = 0;
-
-    /** Call once, at the first user interaction. Repeat calls are ignored. */
-    public static start(): void {
-        if (LunaPlaytime.timer !== null) return;
-
-        window.addEventListener('luna:pause', () => { LunaPlaytime.paused = true; });
-        window.addEventListener('luna:resume', () => { LunaPlaytime.paused = false; });
-
-        LunaPlaytime.timer = setInterval(() => {
-            if (LunaPlaytime.paused) return;
-            LunaPlaytime.seconds += 10;
-            LunaPlaytime.log('playtime_' + LunaPlaytime.seconds + 's');
-        }, LunaPlaytime.STEP_MS);
-    }
-
-    private static log(name: string): void {
-        const plbx = window.plbx_html || window.super_html;
-        if (plbx && typeof plbx.log_event === 'function') plbx.log_event(name, 1);
-    }
-}
-```
-
-Wire it:
+A time-based funnel is the usual first one, and it is short enough to sketch:
 
 ```ts
-// GameEntryPoint.startLevel()
-private startLevel(): void {
-    if (!this.isLevelStarted) {
-        AdPlatformService.logApplovinEvent(AdEvents.Started);
-        LunaPlaytime.start();            // ← first click starts the funnel
-    }
-    this.isLevelStarted = true;
-    this.startScreen.hide();
-}
+// One event per 10s of ACTIVE play, started at the first real interaction.
+// Paused time is skipped — the container fires luna:pause when the ad is
+// backgrounded, and counting through it inflates the funnel with time nobody saw.
+let seconds = 0, paused = false;
+addEventListener('luna:pause',  () => { paused = true; });
+addEventListener('luna:resume', () => { paused = false; });
+setInterval(() => {
+    if (paused) return;
+    seconds += 10;
+    window.plbx_html?.log_event?.('playtime_' + seconds + 's', 1);
+}, 10_000);
 ```
 
-Nothing else is needed: Luna's standard events cover impression, engagement and
-click on their own, and the existing AppLovin/Axon funnel keeps working
-untouched (`ALPlayableAnalytics` simply does not exist in a Luna build, so
-`scheduleApplovinEvent` no-ops).
+Two things worth copying from that sketch whatever your events are:
+
+- **Start from a real gameplay event, not `pointerdown`.** A tap on the splash,
+  the sound toggle or the end card is not play. Projects usually already have
+  the moment — a tutorial→play state transition, a first input handler — and
+  it is a better hook than a raw listener.
+- **No ceiling of your own is needed for a 10s step.** Luna's 256-per-session
+  cap lands at 42 minutes, which no playable session reaches. Anything fired in
+  a loop, though, needs its own bound: the cap is shared across every custom
+  event the game sends.
 
 ## 3. Build and package
 

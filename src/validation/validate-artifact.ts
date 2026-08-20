@@ -11,6 +11,20 @@ import {
 import { scanLoaderHealth } from './loader-health'
 import { detectRegionalParams, extractStoreUrls } from './store-url-extractor'
 
+/**
+ * Call to action attached to every iOS/WebKit audio-risk warning.
+ *
+ * These two checks are heuristics over a format WebKit decodes differently from
+ * Chrome, and neither the packager nor this validator can run WebAudio — a warn
+ * here is "unknown on iOS", not "probably fine". Without an explicit next step
+ * the row reads as cosmetic and ships unverified, so state the two ways out.
+ *
+ * Kept FIRST in `details`: the file list that follows is long and gets truncated
+ * by narrow report panels, which would hide a trailing CTA.
+ */
+export const IOS_AUDIO_RISK_CTA =
+  'MUST be validated on a real iOS device in Safari, or fixed (re-encode the files below).'
+
 /** Substring identifying a usable Google Play Store URL (mirrors the packager). */
 const GOOGLE_PLAY_MARKER = 'play.google.com/store/apps/details'
 
@@ -133,7 +147,7 @@ export function validateArtifact(input: ValidateArtifactInput): CheckResult[] {
         id: 'risky-audio',
         label: 'No iOS-risky audio (ogg/opus/webm)',
         status: 'warning',
-        details: `Safari/iOS may fail to decode: ${riskyAudio.join(', ')}`,
+        details: `${IOS_AUDIO_RISK_CTA} Safari/iOS may fail to decode: ${riskyAudio.join(', ')}`,
       })
     }
 
@@ -143,7 +157,7 @@ export function validateArtifact(input: ValidateArtifactInput): CheckResult[] {
         id: 'hostile-mp3',
         label: 'No WebKit-hostile MP3 (ultra-short VBR/Xing)',
         status: 'warning',
-        details: `Heuristic flagged: ${hostileMp3.join(', ')}`,
+        details: `${IOS_AUDIO_RISK_CTA} Heuristic flagged: ${hostileMp3.join(', ')}`,
       })
     }
 

@@ -43,6 +43,9 @@ const REQUIRED_EXPORTS = [
   'LUNA_SPEC_URL',
   'extractLunaUsage',
   'validateLunaEvents',
+  // added in 0.3.9 — the extension's preview checklist repeats the same iOS
+  // audio-risk call to action in its hints, and must not fork the wording
+  'IOS_AUDIO_RISK_CTA',
 ] as const
 
 describe('public API barrel', () => {

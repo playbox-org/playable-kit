@@ -65,6 +65,7 @@ export {
 } from './validation/luna-events'
 export type { LunaCheck, LunaEventUsage } from './validation/luna-events'
 export {
+  IOS_AUDIO_RISK_CTA,
   findForbiddenLiterals,
   summarizeChecks,
   validateArtifact,

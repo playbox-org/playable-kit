@@ -4,6 +4,7 @@ import * as os from 'os'
 import { join } from 'path'
 
 import {
+  IOS_AUDIO_RISK_CTA,
   findForbiddenLiterals,
   summarizeChecks,
   validateArtifact,
@@ -133,5 +134,36 @@ describe('validateArtifact — luna events', () => {
         .map((c) => c.id)
         .filter((id) => id.startsWith('luna-')),
     ).toEqual([])
+  })
+})
+
+// A warn on either audio row means "we could not tell from here" — WebKit is
+// the only decoder that settles it. The CTA is what turns the row into an
+// action, and it must lead the details string: the file list behind it is long
+// and report panels truncate, which would hide a trailing CTA.
+describe('iOS audio-risk warnings', () => {
+  const artifact = (marker: string) =>
+    validateArtifact({
+      networkId: 'mintegral',
+      html: `<html><head><!-- ${marker} --></head><body></body></html>`,
+      files: [],
+    })
+
+  it('leads the risky-audio warning with the iOS call to action', () => {
+    const check = artifact('plbx-risky-audio: assets/sfx/hit.ogg').find(
+      (c) => c.id === 'risky-audio',
+    )
+    expect(check?.status).toBe('warning')
+    expect(check?.details?.startsWith(IOS_AUDIO_RISK_CTA)).toBe(true)
+    expect(check?.details).toContain('assets/sfx/hit.ogg')
+  })
+
+  it('leads the hostile-mp3 warning with the iOS call to action', () => {
+    const check = artifact('plbx-hostile-mp3: assets/sfx/tap.mp3').find(
+      (c) => c.id === 'hostile-mp3',
+    )
+    expect(check?.status).toBe('warning')
+    expect(check?.details?.startsWith(IOS_AUDIO_RISK_CTA)).toBe(true)
+    expect(check?.details).toContain('assets/sfx/tap.mp3')
   })
 })

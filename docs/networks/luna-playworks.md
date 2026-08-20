@@ -288,6 +288,7 @@ Luna's caps: **256 events per session**, **32 per unique event name**.
 | `value_int` | warn | An integer `value` is passed for every string-named event. Call-shape aware: a value-less `plbx_html.log_event('x')` is fine (the bridge defaults to `1`), a value-less `pi.logCustomEvent('x')` is not; a non-integer is flagged in both, since the bridge substitutes `1` and the author's number is not what Luna records |
 | `cta_via_install` | error | Every CTA went through `InstallFullGame()` — otherwise Luna's standard **Ad Click** never fires |
 | `no_sdk_redefine` | error | The creative does not assign `window.pi` or `window.Luna` — Luna's exporter provides both |
+| `axon_names` | warn | No AppLovin Axon event name (`DISPLAYED`, `CHALLENGE_*`, …) was sent through the Luna channel — those belong to `ALPlayableAnalytics.trackEvent()` and are AppLovin-only. Confusing the two fails silently in both directions, and Axon's own validator only guards the opposite one |
 | `dynamic_names` | info | Event names built at runtime (`'playtime_' + n + 's'`) — expected, but unverifiable statically; surfaced so the count is not read as "no events" |
 
 Empty usage produces no checks (a project with no custom events gets no

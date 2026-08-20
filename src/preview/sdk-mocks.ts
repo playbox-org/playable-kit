@@ -29,6 +29,9 @@ function expectedCtaMethod(networkId: string, mraid: boolean): string {
     vungle: 'vungle_download',
     bigo: 'bgy_mraid',
     mytarget: 'mtrg',
+    // Luna's standard Ad Click fires only from Luna.Unity.Playable.InstallFullGame()
+    // — a bare window.open() must read as an incorrect CTA, not a success.
+    luna: 'luna_install',
   }
   return MAP[networkId] || (mraid ? 'mraid.open' : 'window.open')
 }
@@ -490,6 +493,205 @@ export function generatePreviewUtil(params: PreviewUtilParams): string {
       return _origOpen(url);
     };
   }
+`)
+  }
+
+  if (networkId === 'luna') {
+    parts.push(`
+  // ---- Luna / Unity Playworks mock ----
+  //
+  // Luna is an authoring platform: its SDK (window.Luna + window.pi) and its
+  // standard events are injected by the EXPORTER, so nothing of it exists in a
+  // local preview. The mock stands in for the host — it owns the boot, counts
+  // every custom event against Luna's caps (32 per name / 256 per session) and
+  // simulates the standard events at the moments Luna fires them, so their
+  // PRECONDITIONS can be validated before upload.
+  var _lunaCounts = {}, _lunaTotal = 0, _lunaStarted = false;
+
+  // Every report carries the per-name count, the session total, the
+  // before-startGame flag and the value check — the panel computes the caps
+  // verdicts from these numbers alone.
+  //
+  // The session total counts CUSTOM events only. Luna's 256-per-session budget
+  // is spent by the events the game authors; the six standard ones are Luna's
+  // own and are simulated here purely because the real ones are injected at
+  // export. Charging them to the budget inflated both the caps verdict and the
+  // panel footer by up to six against what Luna actually counts. Per-name
+  // counts stay on every event — the standard rows still show their fires.
+  function _lunaEvent(name, value, kind) {
+    _lunaCounts[name] = (_lunaCounts[name] || 0) + 1;
+    if (kind === 'custom') _lunaTotal++;
+    report('luna_event', {
+      name: name, value: value, kind: kind,
+      count: _lunaCounts[name], total: _lunaTotal,
+      beforeStart: !_lunaStarted,
+      // Luna silently drops a string-named event without an INTEGER value, and
+      // this test must be the same one the static gate applies (isIntegerish in
+      // validation/luna-events.ts) — two validators disagreeing about the same
+      // call is worse than either being strict: a preview that green-lights
+      // logCustomEvent('frac', 1.5) tells the author their creative is fine
+      // right up until packaging refuses it. Hence the integer test, not merely
+      // isFinite.
+      //
+      // The mock only ever sees what reaches window.pi, so it cannot tell a
+      // direct pi.logCustomEvent from a bridged plbx_html.log_event — and it
+      // does not need to: the bridge coerces on its own side (value | 0, with a
+      // missing value becoming 1 — see lunaBridge in base.ts), so every
+      // bridged call arrives here already integer. A value that arrives
+      // fractional, non-numeric or missing therefore came from a DIRECT call,
+      // which is exactly the shape isIntegerish rejects. Reporting it is honest;
+      // the value-less bridge call the static gate forgives never gets here.
+      valueOk: (kind !== 'custom') ||
+        (typeof value === 'number' && isFinite(value) && Math.floor(value) === value),
+    });
+  }
+
+  window.pi = window.pi || { logCustomEvent: function (name, value) { _lunaEvent(name, value, 'custom'); } };
+
+  window.Luna = window.Luna || {
+    Unity: {
+      Playable: { InstallFullGame: function () {
+        // Luna's standard Ad Click fires from InstallFullGame and nowhere else.
+        report('cta', { url: (window.plbx_html || {}).google_play_url || '', method: 'luna_install' });
+        _lunaEvent('adClick', 1, 'standard');
+      } },
+      LifeCycle: { GameEnded: function () { report('game_end', { source: 'luna' }); } },
+      // Returning the caller's default is what Luna's own reference archive does
+      // before Playground fields are authored.
+      Playground: { get: function (section, key, def) { return def; } },
+    },
+  };
+
+  // Luna's host calls startGame(); with window.Luna present the creative must
+  // NOT self-start, so calling it here exercises the real gate instead of the
+  // dev fallback.
+  //
+  // This is a POLL, not a single sample, and that is load-bearing. The packaged
+  // bridge defines window.startGame inside __plbx_pre_boot, which the runtime
+  // loader runs only AFTER it has unpacked the inlined ZIP — that lands well
+  // after 'load' and takes as long as the machine takes. A one-shot probe that
+  // fired before the unpack finished (the original 50ms setTimeout) left the
+  // preview stuck on the splash FOREVER — the mock has defined window.Luna, so
+  // the creative's "no Luna host -> start myself" fallback is disabled by
+  // design and nothing else would ever boot it — and it reported a start_game
+  // failure for a perfectly good artifact. Bounded retries are the house
+  // pattern for exactly this (runtime loader's pollDl, mraidDeferBootGate, the
+  // adImpression canvas fallback below).
+  var LUNA_START_POLL_MS = 50;
+  // 15s: the wait has to cover a JSZip unpack of a fully-inlined artifact plus
+  // Cocos engine init on a cold, throttled machine. Erring long is cheap (a
+  // genuinely dead creative is reported a few seconds later); erring short is
+  // the bug above.
+  var LUNA_START_TIMEOUT_MS = 15000;
+  function _lunaStartGame(source) {
+    if (_lunaStarted) return true;
+    if (typeof window.startGame !== 'function') return false;
+    _lunaStarted = true;
+    report('luna_lifecycle', { name: 'startGame', source: source });
+    try { window.startGame(); }
+    catch (err) { report('error', { message: 'luna: startGame() threw: ' + (err && err.message) }); }
+    return true;
+  }
+
+  _lunaEvent('adLoading', 1, 'standard');
+  window.addEventListener('load', function () {
+    _lunaEvent('adReady', 1, 'standard');
+    _lunaEvent('adStarting', 1, 'standard');
+    var waited = 0;
+    (function pollStartGame() {
+      if (_lunaStartGame('host')) return;   // boot on the first tick that sees it
+      waited += LUNA_START_POLL_MS;
+      if (waited >= LUNA_START_TIMEOUT_MS) {
+        // Only now is it a real finding: the creative never defined startGame,
+        // so Luna's host would have nothing to call.
+        report('error', { message: 'luna: startGame() was never defined (waited ' + (LUNA_START_TIMEOUT_MS / 1000) + 's)' });
+        return;
+      }
+      setTimeout(pollStartGame, LUNA_START_POLL_MS);
+    })();
+  });
+
+  // adEngagement = first pointer input, whatever flavour the device sends.
+  //
+  // ONE handler shared by all three types, plus a fired flag. Registering a
+  // separate closure per type (the obvious forEach) is a bug: each closure can
+  // only unregister ITSELF, and a single tap synthesises pointerdown + mousedown
+  // (plus touchstart on a touch screen), so adEngagement got reported 2-3x for
+  // one tap. Luna's real Ad Engagement fires once per session, and the panel
+  // reads that per-name count to validate first-interaction.
+  (function () {
+    var INPUT_TYPES = ['pointerdown', 'touchstart', 'mousedown'];
+    var _lunaEngaged = false;
+    function _lunaFirstInput() {
+      if (_lunaEngaged) return;   // a sibling event of the same tap already counted it
+      _lunaEngaged = true;
+      INPUT_TYPES.forEach(function (t) { window.removeEventListener(t, _lunaFirstInput, true); });
+      _lunaEvent('adEngagement', 1, 'standard');
+    }
+    INPUT_TYPES.forEach(function (t) { window.addEventListener(t, _lunaFirstInput, true); });
+  })();
+
+  // adImpression = the first rendered frame. The build already computes that
+  // moment for the splash (splash.ts FIRST_FRAME_HOOK_JS calls
+  // window.__plbx_splash_hide on cc.director's EVENT_END_FRAME), so decorate
+  // that assignment rather than re-implementing the Cocos frame probe. A build
+  // packaged with the splash off never assigns it — hence the render-surface
+  // fallback, which stays silent if no canvas ever appears (a missed impression
+  // is a finding, not something to fake).
+  var _lunaImpressed = false;
+  function _lunaImpression() {
+    if (_lunaImpressed) return;
+    _lunaImpressed = true;
+    _lunaEvent('adImpression', 1, 'standard');
+  }
+  (function () {
+    var _splashHide;
+    try {
+      Object.defineProperty(window, '__plbx_splash_hide', {
+        configurable: true,
+        get: function () { return _splashHide; },
+        set: function (fn) {
+          _splashHide = (typeof fn === 'function') ? function () {
+            _lunaImpression();
+            return fn.apply(this, arguments);
+          } : fn;
+        }
+      });
+    } catch (e) {}
+    var tries = 0;
+    var iv = setInterval(function () {
+      if (_lunaImpressed) { clearInterval(iv); return; }
+      if (document.querySelector('canvas')) {
+        clearInterval(iv);
+        requestAnimationFrame(function () { requestAnimationFrame(_lunaImpression); });
+        return;
+      }
+      if (++tries >= 100) clearInterval(iv);   // ~10s, then give up quietly
+    }, 100);
+  })();
+
+  // Manual-trigger protocol (mirrors plbx:molocov2) — the validator UI drives
+  // Luna's container lifecycle from outside the iframe.
+  window.addEventListener('message', function (e) {
+    var d = e && e.data;
+    if (!d || typeof d !== 'object' || d.type !== 'plbx:luna') return;
+    var evt = { build: 'luna:build', pause: 'luna:pause', resume: 'luna:resume', mute: 'luna:mute', unmute: 'luna:unmute' }[d.action];
+    try {
+      if (evt) { window.dispatchEvent(new Event(evt)); report('luna_lifecycle', { name: evt }); return; }
+      if (d.action === 'start-game') {
+        // Same one-shot boot path as the auto poll — a manual trigger after the
+        // poll already booted must not start the game twice.
+        if (!_lunaStartGame('manual') && !_lunaStarted) {
+          report('error', { message: 'luna: start-game trigger, but startGame() is not defined (yet)' });
+        }
+        return;
+      }
+      if (d.action === 'game-end' && window.plbx_html && window.plbx_html.game_end) { window.plbx_html.game_end(); return; }
+      if (d.action === 'cta' && window.plbx_html && window.plbx_html.download) { window.plbx_html.download(); return; }
+    } catch (err) {
+      report('error', { message: 'luna trigger ' + d.action + ': ' + (err && err.message) });
+    }
+  });
 `)
   }
 

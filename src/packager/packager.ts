@@ -13,7 +13,12 @@ import { HtmlBuilder } from './html-builder'
 import { getAdapter } from './network-adapters'
 import { buildZip } from './zip-builder'
 import { getNetwork, NETWORKS, maxSizeForFormat } from '../networks'
-import { PackageResult, OutputFormat } from '../types'
+import {
+  PackageResult,
+  OutputFormat,
+  NetworkConfig,
+  PackageConfig,
+} from '../types'
 import { PackagerOptions, PackagerResult } from './types'
 import { packDirectoryToZip } from './asset-inliner'
 import { rewriteCocosJs, shouldRewriteCocosJs } from './cocos-js-rewriter'
@@ -36,6 +41,7 @@ import {
   hostileMp3Marker,
 } from '../validation/audio-format-check'
 import { extractAxonUsage, validateAxonEvents } from '../validation/axon-events'
+import { extractLunaUsage, validateLunaEvents } from '../validation/luna-events'
 import { buildVersionBanner } from './version-banner'
 import CleanCSS from 'clean-css'
 import { KIT_VERSION } from '../version'
@@ -113,6 +119,40 @@ export async function packageForNetworks(
       ].filter((u): u is string => !!u),
     ),
   )
+
+  // Luna's luna.json needs the store URLs and a display name, but the editor
+  // never sets PackageConfig.storeUrl*/appName — the real URLs live in the game
+  // source and only headStoreUrls knows them. Resolved into a SEPARATE config
+  // that only the luna target is packaged with, never into options.config:
+  // BaseAdapter.transform emits `window.plbx_html.google_play_url = "<url>"`
+  // from those very fields for EVERY network, so backfilling in place silently
+  // turned every MRAID CTA from `mraid.open()` into `mraid.open(<scraped URL>)`
+  // on 20+ live targets — an unreviewed behaviour change shipped as a side
+  // effect of a Luna feature. Mutating the caller's object also leaked into the
+  // next run that reused it. Fill just what is empty so a programmatic (CLI)
+  // caller still wins.
+  const resolvedStore = resolveStoreUrls(headStoreUrls)
+  const lunaConfig: PackageConfig = {
+    ...options.config,
+    storeUrlAndroid: options.config.storeUrlAndroid || resolvedStore.android,
+    storeUrlIos: options.config.storeUrlIos || resolvedStore.ios,
+    // Display name for manifests that need one (Luna's applicationName). Spec
+    // §2: `templateVariables.assetTitle || projectName || ''` — and no further.
+    // This deliberately does NOT fall back to the build directory name the way
+    // the Moloco launcher's assetTitle does: luna.json is shipped to the
+    // client's Playworks account, and a run against ./lunacheck/ produced a
+    // real archive declaring `"applicationName": "lunacheck"` — our internal
+    // scratch folder, published as the app's name. An empty string is Luna's
+    // documented "unknown" and is what the reference archive ships; the
+    // human-facing playground.json title is where a display placeholder
+    // belongs (see LunaAdapter.getZipExtraFiles).
+    appName:
+      options.config.appName ||
+      options.templateVariables?.assetTitle ||
+      options.templateVariables?.projectName ||
+      '',
+  }
+
   const hasGooglePlayUrl = headStoreUrls.some((u) =>
     u.includes(GOOGLE_PLAY_MARKER),
   )
@@ -135,6 +175,15 @@ export async function packageForNetworks(
   // HTML — invisible to a plaintext scan. Extract them once from the build
   // source so the applovin branch below can warn on spec violations.
   const axonUsage = extractAxonUsage(options.buildDir)
+
+  // Same story for Luna's custom analytics events (window.pi.logCustomEvent):
+  // authored in the game source, buried in the encoded asset container by the
+  // time the artifact exists. Extracted once, consumed by the luna branch below.
+  // Only walked when luna is actually targeted — this is a second full-tree
+  // scan and every other network pays nothing for it.
+  const lunaUsage = options.networks.includes('luna')
+    ? extractLunaUsage(options.buildDir)
+    : null
 
   // Risky audio (ogg/opus/webm) — Safari/iOS WebAudio decodeAudioData can't
   // decode these on older / in-app WebViews, so the playable can hang on boot.
@@ -159,9 +208,15 @@ export async function packageForNetworks(
 
       const adapter = getAdapter(networkId)
 
+      // Only the luna target sees the resolved store URLs / appName above.
+      // Every other network is packaged with the caller's config verbatim, so
+      // its artifact stays byte-identical to what it was before Luna existed.
+      const packageConfig: PackageConfig =
+        networkId === 'luna' ? lunaConfig : options.config
+
       // Clone HTML and apply network adapter
       const builder = new HtmlBuilder(baseHtml)
-      adapter.transform(builder, options.config)
+      adapter.transform(builder, packageConfig)
 
       // Startup version banner + plaintext store-URL <head> comments (super-html parity).
       builder.injectBodyScript(versionBanner)
@@ -239,6 +294,21 @@ export async function packageForNetworks(
         }
       }
 
+      // Luna custom-event conformance (advisory — same reasoning as Axon: the
+      // events are developer-authored, so a violation warns, never aborts).
+      // Static half only: names, values, SDK redefinition, dynamic-name count.
+      // The 32/256 caps are runtime facts and are validated in the preview
+      // (spec §7) — validateLunaEvents omits them for static usage on purpose.
+      if (networkId === 'luna' && lunaUsage) {
+        for (const c of validateLunaEvents(lunaUsage)) {
+          if (c.ok) continue
+          const w = `Luna events — ${c.detail || c.label}`
+          warnings.push(w)
+          console.warn(`[plbx] ${w}`)
+          options.onProgress?.(networkId, 'processing', w)
+        }
+      }
+
       if (network.format === 'launcher-payload') {
         options.onProgress?.(
           networkId,
@@ -257,9 +327,9 @@ export async function packageForNetworks(
         mkdirSync(outDir, { recursive: true })
 
         const launcherLoaderMode =
-          options.config.legacyLoaderNetworks?.includes(networkId)
+          packageConfig.legacyLoaderNetworks?.includes(networkId)
             ? 'systemjs'
-            : (options.config.loaderMode ?? 'self-contained')
+            : (packageConfig.loaderMode ?? 'self-contained')
         // Build payload.js (IIFE injecting full Cocos runtime into launcher's document).
         // Apply the same cocos-js rewrite as the main path (currentScript/new URL +
         // for self-contained also XMLHttpRequest/createElement → FB-safe shims).
@@ -430,9 +500,9 @@ export async function packageForNetworks(
 
           // Per-network loader engine: global loaderMode, overridable by pinning
           // a network into legacyLoaderNetworks (rollback path).
-          const globalLoaderMode = options.config.loaderMode ?? 'self-contained'
+          const globalLoaderMode = packageConfig.loaderMode ?? 'self-contained'
           const effectiveLoaderMode =
-            options.config.legacyLoaderNetworks?.includes(networkId)
+            packageConfig.legacyLoaderNetworks?.includes(networkId)
               ? 'systemjs'
               : globalLoaderMode
 
@@ -464,9 +534,9 @@ export async function packageForNetworks(
             cssContent,
             buildDir: options.buildDir,
             loaderMode: effectiveLoaderMode,
-            showSplash: options.config.showSplash !== false,
+            showSplash: packageConfig.showSplash !== false,
             splashLogoDataUrl,
-            splashLogoScale: options.config.splashLogoScale,
+            splashLogoScale: packageConfig.splashLogoScale,
           })
 
           assertNoForbiddenStrings(
@@ -484,49 +554,26 @@ export async function packageForNetworks(
             // Wrap the single HTML in a ZIP (+ optional config.json)
             const tempDir = join(dirname(outputPath), `_temp_${networkId}`)
             mkdirSync(tempDir, { recursive: true })
-            // Some networks (Mintegral, per their 2026 zip-naming rule) require the
-            // inner HTML to match the playable filename — i.e. the outer .zip
-            // basename — rather than the generic index.html, or the load fails.
-            let innerHtmlName = 'index.html'
-            if (network.htmlMatchesZipName) {
-              let zipBase = basename(outputPath, extname(outputPath))
-              // Default template leaves the basename as "index" — auto-name after
-              // the playable (assetTitle / projectName override, else the build
-              // folder name) so it works out of the box without a custom template.
-              if (!zipBase || zipBase === 'index') {
-                zipBase =
-                  options.templateVariables?.assetTitle ||
-                  options.templateVariables?.projectName ||
-                  deriveProjectNameFromBuildDir(options.buildDir) ||
-                  ''
-              }
-              // Mintegral 2026 moderation rule: "Html file name are supported with
-              // letters, Numbers, and underscores only." sanitizeFileBase keeps
-              // dashes/dots (fine for other targets) so apply a stricter pass here
-              // — collapse anything outside [A-Za-z0-9_] to underscore. Rename the
-              // outer .zip too: htmlMatchesZipName means the network loads the inner
-              // HTML by the zip basename, so both must match AND both must be clean.
-              zipBase = sanitizeFileBase(zipBase)
-                .replace(/[^A-Za-z0-9_]+/g, '_')
-                .replace(/^_+|_+$/g, '')
-              if (zipBase && zipBase !== 'index') {
-                innerHtmlName = `${zipBase}.html`
-                outputPath = join(
-                  dirname(outputPath),
-                  `${zipBase}${extname(outputPath)}`,
-                )
-              }
-            }
-            writeFileSync(join(tempDir, innerHtmlName), finalHtml)
+            const named = resolveInnerHtmlName(
+              network,
+              outputPath,
+              options.templateVariables,
+              options.buildDir,
+            )
+            outputPath = named.outputPath
+            writeFileSync(join(tempDir, named.innerHtmlName), finalHtml)
 
             const extraFiles: Array<{ zipPath: string; content: string }> = []
-            const zipConfig = adapter.getZipConfig(options.config)
+            const zipConfig = adapter.getZipConfig(packageConfig)
             if (zipConfig) {
               extraFiles.push({
                 zipPath: 'config.json',
                 content: JSON.stringify(zipConfig),
               })
             }
+            // Everything the hard-coded config.json can't express (Luna's
+            // luna.json + playground.json). Default is an empty list.
+            extraFiles.push(...adapter.getZipExtraFiles(packageConfig))
 
             const zipResult = await buildZip({
               sourceDir: tempDir,
@@ -543,7 +590,7 @@ export async function packageForNetworks(
             // primary `index.html`. In "both" (A/B) mode base122 keeps the bare name
             // and the base64 sibling carries a `.b64` suffix.
             const encodings = resolveInlinedEncodings(
-              options.config,
+              packageConfig,
               effectiveLoaderMode,
             )
             const multi = encodings.length > 1
@@ -557,9 +604,9 @@ export async function packageForNetworks(
                       cssContent,
                       buildDir: options.buildDir,
                       loaderMode: effectiveLoaderMode,
-                      showSplash: options.config.showSplash !== false,
+                      showSplash: packageConfig.showSplash !== false,
                       splashLogoDataUrl,
-                      splashLogoScale: options.config.splashLogoScale,
+                      splashLogoScale: packageConfig.splashLogoScale,
                       encoding: 'base122',
                     })
               if (enc === 'base122') {
@@ -614,17 +661,41 @@ export async function packageForNetworks(
             adapter.getRequiredStrings(),
             network.name,
           )
-          writeFileSync(join(tempDir, 'index.html'), zipBranchHtml)
+          const plainNamed = resolveInnerHtmlName(
+            network,
+            outputPath,
+            options.templateVariables,
+            options.buildDir,
+          )
+          // Take the returned outputPath too, exactly as the wrap branch does:
+          // htmlMatchesZipName derives BOTH names from one base, so discarding
+          // the renamed archive here would ship Foo.html inside index.zip — the
+          // mismatch the rule exists to prevent.
+          outputPath = plainNamed.outputPath
+          // cpSync brought the build's OWN index.html across untransformed. While
+          // the inner name was always index.html the write below overwrote it;
+          // once the name can differ (Luna's source.html, Mintegral's
+          // <Playable>.html) the copy would survive next to the transformed file
+          // and the archive would carry two entry points — a loader that opens
+          // index.html would get the raw build: no network bridge, no CTA, no
+          // lifecycle. Delete BEFORE writing, never after: on a case-insensitive
+          // filesystem "Index.html" IS index.html, so deleting afterwards would
+          // remove the file we just wrote.
+          const copiedIndexHtml = join(tempDir, 'index.html')
+          if (existsSync(copiedIndexHtml)) rmSync(copiedIndexHtml, { force: true })
+          writeFileSync(join(tempDir, plainNamed.innerHtmlName), zipBranchHtml)
 
           const extraFiles: Array<{ zipPath: string; content: string }> = []
 
-          const zipConfig = adapter.getZipConfig(options.config)
+          const zipConfig = adapter.getZipConfig(packageConfig)
           if (zipConfig) {
             extraFiles.push({
               zipPath: 'config.json',
               content: JSON.stringify(zipConfig),
             })
           }
+          // See the wrap branch — adapter-supplied manifests alongside the HTML.
+          extraFiles.push(...adapter.getZipExtraFiles(packageConfig))
 
           const zipResult = await buildZip({
             sourceDir: tempDir,
@@ -750,6 +821,75 @@ function sanitizeFileBase(name: string): string {
     .trim()
     .replace(/[^A-Za-z0-9._-]+/g, '_')
     .replace(/^_+|_+$/g, '')
+}
+
+/**
+ * Resolve the HTML filename to write INSIDE a zip, plus the (possibly renamed)
+ * outer .zip path. Two network rules, in precedence order:
+ *   1. `htmlFileName` — a literal the target's loader looks for by name
+ *      (Luna's exporter opens `source.html`). Never touches the outer .zip.
+ *   2. `htmlMatchesZipName` — Mintegral's 2026 zip-naming rule: the inner HTML
+ *      must match the playable filename, i.e. the outer .zip basename, so BOTH
+ *      are derived from the same sanitized base.
+ * Otherwise the generic `index.html`.
+ */
+export function resolveInnerHtmlName(
+  network: NetworkConfig,
+  outputPath: string,
+  templateVariables: Record<string, string> | undefined,
+  buildDir?: string,
+): { innerHtmlName: string; outputPath: string } {
+  if (network.htmlFileName) {
+    return { innerHtmlName: network.htmlFileName, outputPath }
+  }
+  if (!network.htmlMatchesZipName) {
+    return { innerHtmlName: 'index.html', outputPath }
+  }
+
+  let zipBase = basename(outputPath, extname(outputPath))
+  // Default template leaves the basename as "index" — auto-name after the
+  // playable (assetTitle / projectName override, else the build folder name)
+  // so it works out of the box without a custom template.
+  if (!zipBase || zipBase === 'index') {
+    zipBase =
+      templateVariables?.assetTitle ||
+      templateVariables?.projectName ||
+      (buildDir ? deriveProjectNameFromBuildDir(buildDir) : null) ||
+      ''
+  }
+  // Mintegral 2026 moderation rule: "Html file name are supported with
+  // letters, Numbers, and underscores only." sanitizeFileBase keeps
+  // dashes/dots (fine for other targets) so apply a stricter pass here —
+  // collapse anything outside [A-Za-z0-9_] to underscore. Rename the outer
+  // .zip too: htmlMatchesZipName means the network loads the inner HTML by the
+  // zip basename, so both must match AND both must be clean.
+  zipBase = sanitizeFileBase(zipBase)
+    .replace(/[^A-Za-z0-9_]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+  if (!zipBase || zipBase === 'index') {
+    return { innerHtmlName: 'index.html', outputPath }
+  }
+  return {
+    innerHtmlName: `${zipBase}.html`,
+    outputPath: join(dirname(outputPath), `${zipBase}${extname(outputPath)}`),
+  }
+}
+
+/**
+ * Split a flat store-URL list into the iOS/Android pair adapters expect.
+ * The packager recovers URLs from the build source as one unordered list; the
+ * store they belong to is only recoverable from the host.
+ */
+export function resolveStoreUrls(urls: string[]): {
+  ios?: string
+  android?: string
+} {
+  const out: { ios?: string; android?: string } = {}
+  for (const u of urls) {
+    if (!out.android && /play\.google\.com/i.test(u)) out.android = u
+    if (!out.ios && /(apps|itunes)\.apple\.com/i.test(u)) out.ios = u
+  }
+  return out
 }
 
 /**

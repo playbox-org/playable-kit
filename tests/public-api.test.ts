@@ -35,6 +35,14 @@ const REQUIRED_EXPORTS = [
   'MIN_LOGO_SCALE',
   'MAX_LOGO_SCALE',
   'FIRST_FRAME_HOOK_JS',
+  // added in 0.3.8 — Luna / Unity Playworks target: the analytics validator is
+  // shared by the package-time gate and the extension's preview panel (which
+  // renders the caps + standard-event list it gets over /api/networks)
+  'LUNA_STANDARD_EVENTS',
+  'LUNA_EVENT_CAPS',
+  'LUNA_SPEC_URL',
+  'extractLunaUsage',
+  'validateLunaEvents',
 ] as const
 
 describe('public API barrel', () => {

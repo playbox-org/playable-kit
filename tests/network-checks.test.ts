@@ -73,3 +73,38 @@ describe('game_end hint is network-correct', () => {
     expect(check!.hint).toContain('alongside the CTA')
   })
 })
+
+// Luna is a packaging TARGET, not a delivery network: Luna calls startGame(),
+// Luna's standard Ad Click fires only from InstallFullGame(), and its analytics
+// live under hard caps. None of that maps onto the gameReady/gameStart/gameEnd
+// lifecycle sets, so the luna checks are their own two entries.
+describe('luna checks', () => {
+  it('cover the boot gate, CTA and events', () => {
+    const ids = getNetworkChecks('luna', false).map((c) => c.id)
+    expect(ids).toContain('start_game')
+    expect(ids).toContain('cta')
+    expect(ids).toContain('luna_events')
+  })
+
+  it('label the CTA with Luna\'s own API', () => {
+    const cta = getNetworkChecks('luna', false).find((c) => c.id === 'cta')
+    expect(cta!.label).toBe('CTA (Luna.Unity.Playable.InstallFullGame)')
+    expect(cta!.hint).toContain('InstallFullGame()')
+  })
+
+  it('do not borrow the gameReady/gameEnd lifecycle of other networks', () => {
+    const ids = getNetworkChecks('luna', false).map((c) => c.id)
+    expect(ids).not.toContain('game_ready')
+    expect(ids).not.toContain('game_start')
+    expect(ids).not.toContain('game_end')
+    expect(ids).not.toContain('game_close')
+  })
+
+  it('stay out of every other network', () => {
+    for (const id of ['applovin', 'mintegral', 'molocoV2']) {
+      const ids = getNetworkChecks(id, true).map((c) => c.id)
+      expect(ids).not.toContain('start_game')
+      expect(ids).not.toContain('luna_events')
+    }
+  })
+})

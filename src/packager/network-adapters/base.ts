@@ -25,6 +25,16 @@ export interface NetworkAdapter {
    * black screen in prod without any build-time signal.
    */
   getRequiredStrings(): string[]
+  /**
+   * Extra files to place in the ZIP next to the HTML. Default none.
+   * `getZipConfig` owns the hard-coded `config.json`; this hook covers
+   * everything else — Luna's upload archive, for instance, must carry a
+   * `luna.json` + `playground.json` pair that the single-file hook cannot
+   * express.
+   */
+  getZipExtraFiles(
+    config: PackageConfig,
+  ): Array<{ zipPath: string; content: string }>
 }
 
 /**
@@ -251,6 +261,227 @@ export function genericBridge(): string {
   return buildPlbxBridge(`if (url) { window.open(url, "_blank"); }`)
 }
 
+/**
+ * Luna (Unity Playworks) bridge.
+ *
+ * Luna is an authoring/export platform, not a delivery network: it re-exports our
+ * archive per ad network and injects that network's SDK itself. So the contract
+ * here is Luna's own, and it owns three things we must hand over:
+ *
+ *  - the BOOT — "all startup logic inside startGame()", which Luna calls once the
+ *    container is ready (docs: JS playables / setup);
+ *  - the CTA — Luna's standard **Ad Click** event fires from
+ *    `Luna.Unity.Playable.InstallFullGame()` and from nowhere else, so a CTA that
+ *    reaches the store any other way is simply not counted;
+ *  - the CONTAINER LIFECYCLE — the `luna:*` window events below.
+ *
+ * We add the analytics CHANNEL (`plbx_html.log_event`) but never concrete events:
+ * `playtime_10s` and level funnels are the game project's business.
+ *
+ * Every call into Luna is wrapped — a throw inside a container callback would take
+ * the whole playable down, and the SDK globals are absent in local dev entirely.
+ */
+export function lunaBridge(): string {
+  return buildPlbxBridge(
+    // The url argument is deliberately ignored: Luna resolves the store link
+    // itself from luna.json, and only InstallFullGame() registers the click.
+    `_plbx_luna_install();`,
+    `// --- Boot gate. Luna's contract is "define startGame(), we call it".
+//
+// startGame is defined RIGHT HERE, synchronously at bridge-injection time, and
+// NOT inside __plbx_pre_boot: the runtime loader calls __plbx_pre_boot only
+// AFTER it has unpacked the base64/JSZip asset payload. Measured on a packaged
+// 3.5 MB artifact in headless Chromium: at the load event (t=186ms) startGame
+// did not exist yet, it appeared at t=274ms. A host that calls startGame() on
+// load — Luna does — hit "startGame is not a function", and because window.Luna
+// is present the self-start fallback below is disabled, so the creative sat on
+// the splash for the entire impression. Now the early call is recorded and boot
+// happens the moment the loader hands us its callback.
+var _plbx_luna_started = false, _plbx_luna_go = null;
+window.startGame = function() {
+  if (_plbx_luna_started) return;                 // Luna may call it more than once
+  _plbx_luna_started = true;
+  if (_plbx_luna_go) { try { _plbx_luna_go(); } catch(e) { console.error('[plbx] luna boot:', e); } }
+  // else: loader not up yet — __plbx_pre_boot boots as soon as it arrives.
+};
+window.__plbx_pre_boot = function(go) {
+  _plbx_luna_go = go;
+  if (_plbx_luna_started) { try { go(); } catch(e) { console.error('[plbx] luna boot:', e); } return; }
+  // No Luna host (local dev, or our preview without the mock) — nobody will ever
+  // call startGame(), so start ourselves instead of hanging on the splash.
+  if (!window.Luna) window.startGame();
+};
+
+// --- CTA. Assigned explicitly rather than left to the object literal above,
+// which is skipped whenever the game pre-defines window.plbx_html: every
+// dispatcher path (plbx_html.download, the super_html alias, a bare
+// window.install()) has to reach InstallFullGame or Ad Click never fires.
+function _plbx_luna_install() {
+  try { Luna.Unity.Playable.InstallFullGame(); } catch(e) { console.error('[plbx] luna cta:', e); }
+}
+window.plbx_html.download = _plbx_luna_install;
+window.install = _plbx_luna_install;
+// Same trap the Facebook/Snap/Google/TikTok/Vungle bridges already close: plenty
+// of game CTA dispatchers never touch plbx_html.download and call window.open(link)
+// themselves (train-miner v1). Under Luna such a click reaches nothing —
+// InstallFullGame() is the ONLY thing that raises Luna's standard Ad Click — so
+// the click would be missing for EVERY network Luna re-exports to. With no Luna
+// host (local dev) fall through to the real window.open so the CTA still works.
+var _plbxOrigOpen = window.open;
+window.open = function(u) {
+  if (window.Luna) { _plbx_luna_install(); return null; }
+  try { return _plbxOrigOpen.apply(window, arguments); } catch(e) { return null; }
+};
+
+// --- Game end. Luna requires it for the Mintegral/Vungle exports; inert elsewhere.
+window.plbx_html.game_end = function() {
+  try { Luna.Unity.LifeCycle.GameEnded(); } catch(e) { console.error('[plbx] luna game_end:', e); }
+};
+
+// --- Analytics channel. window.pi is injected by Luna's exporter, so it is
+// missing in local dev and during early boot. Calls made before it appears are
+// queued and flushed, because a silent drop is the failure mode we are guarding
+// against. The cap is Luna's per-SESSION limit (256) — the 32 that used to sit
+// here is Luna's per-NAME limit and sizing the whole queue by it threw away
+// events a conforming playable is allowed to send. Overflow is counted and
+// surfaced (one console.warn + a counter the preview can read off plbx_html),
+// because an UNCOUNTED drop is exactly the silence this queue exists to prevent.
+var _plbx_luna_q = [], _PLBX_LUNA_Q_MAX = 256, _plbx_luna_warned = false;
+window.plbx_html.luna_dropped_events = 0;
+function _plbx_luna_pi() {
+  return (window.pi && typeof window.pi.logCustomEvent === 'function') ? window.pi : null;
+}
+function _plbx_luna_send(name, value) {
+  try { window.pi.logCustomEvent(name, value); } catch(e) { console.error('[plbx] luna event:', e); }
+}
+// True once pi is live AND the backlog has been handed over. Draining before
+// every send is what keeps a funnel readable: sending the fresh event first
+// delivered it to Luna AHEAD of the older queued ones.
+function _plbx_luna_drain() {
+  if (!_plbx_luna_pi()) return false;
+  while (_plbx_luna_q.length) { var e = _plbx_luna_q.shift(); _plbx_luna_send(e[0], e[1]); }
+  return true;
+}
+window.plbx_html.log_event = function(name, value) {
+  // Luna drops a string-named event that carries no integer parameter, so a
+  // missing or non-numeric value becomes 1 rather than nothing.
+  var v = (typeof value === 'number' && isFinite(value)) ? (value | 0) : 1;
+  if (_plbx_luna_drain()) { _plbx_luna_send(name, v); return; }
+  if (_plbx_luna_q.length < _PLBX_LUNA_Q_MAX) { _plbx_luna_q.push([name, v]); return; }
+  window.plbx_html.luna_dropped_events++;
+  if (!_plbx_luna_warned) {
+    _plbx_luna_warned = true;
+    console.warn('[plbx] luna: analytics queue full at ' + _PLBX_LUNA_Q_MAX + ' events, dropping (window.pi never appeared?)');
+  }
+};
+// Bounded poll — 50 tries x 100ms, the same bound mraidDeferBootGate uses. The
+// unbounded re-arm it replaces left a 10 Hz timer running for the whole life of
+// the ad whenever window.pi never showed up (local dev, any non-Luna host).
+// Giving up is safe: log_event drains the backlog itself if pi appears later.
+(function _plbx_luna_flush(n) {
+  if (_plbx_luna_drain()) return;
+  if (n > 0) { setTimeout(function() { _plbx_luna_flush(n - 1); }, 100); return; }
+  if (_plbx_luna_q.length) console.warn('[plbx] luna: window.pi never appeared; ' + _plbx_luna_q.length + ' event(s) still queued');
+})(50);
+
+// --- Container lifecycle. Luna fires these on window. Everything is guarded:
+// a throw inside a container callback takes the whole playable down.
+// 'luna:build' is deliberately unhandled — it fires right after load, and boot
+// is gated on startGame().
+//
+// Muting: cc.audioEngine is the Cocos Creator **2.x** API. The 3.8 web-mobile
+// builds we actually ship contain ZERO references to it — they play through Web
+// Audio (AudioContext) + AudioSource — so an audioEngine-only mute was a silent
+// no-op on the primary target: the ad kept making noise after Luna muted it,
+// which downstream networks flag as audio-on-mute. So track the contexts
+// themselves. This bridge runs before the engine boots, so patching the
+// constructor here catches every context Cocos creates; same approach as the
+// preview mock in preview/sdk-mocks.ts. The 2.x call and the <audio>/<video>
+// pass stay as additional, independently guarded paths — a build may use any of
+// the three, and one of them throwing must not skip the other two.
+//
+// Suspending is NOT enough on its own. Cocos 3.8's AudioContextAgent has
+//   runContext = function () { ... if ("suspended" === i.state)
+//                                    i.resume().catch(...) ... }
+// and calls it from AudioPlayerWeb.doPlay() and AudioPlayerWebOneShot.play(),
+// i.e. on EVERY playback attempt (plus from a touchend/mouseup handler it
+// installs on GameCanvas). So a bare suspend() lasts exactly until the game
+// plays its next sound — Luna mutes, one more sound plays, the ad is audible
+// again while the container still believes it is muted. Therefore, while
+// muted, resume() itself is neutralised on the tracked contexts: the engine's
+// resume becomes a no-op and only luna:unmute (which puts the original back)
+// can bring audio back.
+var _plbx_luna_ctxs = [], _plbx_luna_muted = false;
+// The engine chains on the return value (i.resume().catch(...), and .then(...)
+// in the gesture path), so the stand-in must be thenable or Cocos throws
+// inside its own play path.
+function _plbx_luna_no_resume() { return Promise.resolve(); }
+// A closed context rejects/throws on suspend()/resume(); swallow both shapes so
+// one dead context cannot break the mute of the others (or raise an unhandled
+// rejection in the ad).
+function _plbx_luna_settle(p) {
+  try { if (p && typeof p.catch === 'function') p.catch(function() {}); } catch(e) {}
+}
+function _plbx_luna_quiet(ctx) {
+  // Stash the original ONCE: a second mute must not stash our own no-op as
+  // "the original", which would make the next unmute restore a no-op and leave
+  // the ad silent for good.
+  if (!ctx._plbx_luna_resume) {
+    ctx._plbx_luna_resume = ctx.resume;
+    ctx.resume = _plbx_luna_no_resume;
+  }
+  _plbx_luna_settle(ctx.suspend());
+}
+function _plbx_luna_loud(ctx) {
+  if (ctx._plbx_luna_resume) {
+    ctx.resume = ctx._plbx_luna_resume;
+    ctx._plbx_luna_resume = null;
+  }
+  _plbx_luna_settle(ctx.resume());
+}
+(function() {
+  try {
+    var _AC = window.AudioContext || window.webkitAudioContext;
+    if (!_AC) return;
+    var _PlbxLunaAC = function AudioContext(opts) {
+      // Options are forwarded — Cocos passes { latencyHint } on some platforms
+      // and swallowing it would change playback behaviour.
+      var ctx = (opts === undefined) ? new _AC() : new _AC(opts);
+      _plbx_luna_ctxs.push(ctx);
+      // Cocos builds its context lazily on the first sound, which can land
+      // AFTER Luna muted us — born muted, or that first sound escapes.
+      if (_plbx_luna_muted) { try { _plbx_luna_quiet(ctx); } catch(e) {} }
+      return ctx;
+    };
+    _PlbxLunaAC.prototype = _AC.prototype;
+    window.AudioContext = _PlbxLunaAC;
+    if (window.webkitAudioContext) window.webkitAudioContext = _PlbxLunaAC;
+  } catch(e) {}
+})();
+function _plbx_luna_audio(muted) {
+  _plbx_luna_muted = muted;
+  for (var i = 0; i < _plbx_luna_ctxs.length; i++) {
+    // Per-context guard: a closed/broken context must not cost the others
+    // their mute.
+    try { muted ? _plbx_luna_quiet(_plbx_luna_ctxs[i]) : _plbx_luna_loud(_plbx_luna_ctxs[i]); } catch(e) {}
+  }
+  try {
+    if (window.cc && window.cc.audioEngine) {
+      if (muted) { window.cc.audioEngine.pauseAll(); } else { window.cc.audioEngine.resumeAll(); }
+    }
+  } catch(e) {}
+  try {
+    var m = document.querySelectorAll('audio, video');
+    for (var j = 0; j < m.length; j++) { m[j].muted = muted; }
+  } catch(e) {}
+}
+window.addEventListener('luna:pause', function() { try { if (window.cc && cc.game) cc.game.pause(); } catch(e) {} });
+window.addEventListener('luna:resume', function() { try { if (window.cc && cc.game) cc.game.resume(); } catch(e) {} });
+window.addEventListener('luna:mute', function() { _plbx_luna_audio(true); });
+window.addEventListener('luna:unmute', function() { _plbx_luna_audio(false); });`,
+  )
+}
+
 export class BaseAdapter implements NetworkAdapter {
   constructor(
     public readonly networkId: string,
@@ -315,6 +546,12 @@ export class BaseAdapter implements NetworkAdapter {
 
   getZipConfig(config: PackageConfig): Record<string, any> | null {
     return this.networkConfig.zipConfig || null
+  }
+
+  getZipExtraFiles(
+    _config: PackageConfig,
+  ): Array<{ zipPath: string; content: string }> {
+    return []
   }
 
   getForbiddenStrings(): string[] {

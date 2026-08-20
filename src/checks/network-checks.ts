@@ -11,6 +11,7 @@ export const CTA_LABELS: Record<string, string> = {
   vungle: 'CTA (postMessage download)',
   mytarget: 'CTA (MTRG.onCTAClick)',
   yandex: 'CTA (yandexHTML5BannerApi)',
+  luna: 'CTA (Luna.Unity.Playable.InstallFullGame)',
 }
 
 // Networks requiring full gameReady/gameStart/gameEnd/gameClose lifecycle
@@ -183,6 +184,17 @@ export function getNetworkChecks(
     })
   }
 
+  // Luna owns the boot: all startup lives inside window.startGame(), which Luna
+  // calls. Deliberately NOT part of FULL_LIFECYCLE / PARTIAL_LIFECYCLE above —
+  // those are gameReady/gameStart networks, Luna's contract is its own.
+  if (networkId === 'luna') {
+    checks.push({
+      id: 'start_game',
+      label: 'startGame() gate honoured',
+      hint: 'All startup logic must run inside window.startGame(); Luna calls it. The preview mock calls it too — if it never got defined, the game self-started and Luna would boot it a second time.',
+    })
+  }
+
   // CTA — with network-specific label
   const ctaLabel =
     CTA_LABELS[networkId] || (mraid ? 'CTA (mraid.open)' : 'CTA Call')
@@ -203,6 +215,7 @@ export function getNetworkChecks(
     mytarget: 'Call MTRG.onCTAClick() when the user taps the CTA button.',
     yandex:
       'Call yandexHTML5BannerApi.getClickURLNum(1) when the user taps the CTA button.',
+    luna: "Call Luna.Unity.Playable.InstallFullGame() when the user taps the CTA button — Luna's standard Ad Click fires from there and nowhere else. plbx_html.download() and window.install() already route into it.",
   }
   checks.push({
     id: 'cta',
@@ -213,6 +226,17 @@ export function getNetworkChecks(
         ? 'Call mraid.open(storeUrl) when the user taps the CTA button.'
         : 'Trigger a CTA call when the user taps the download button. Use the network-specific API.'),
   })
+
+  // Luna's analytics caps are runtime facts (32 per unique name, 256 per
+  // session), so the verdict is computed from the preview event stream — see
+  // validateLunaEvents in src/validation/luna-events.ts.
+  if (networkId === 'luna') {
+    checks.push({
+      id: 'luna_events',
+      label: 'Analytics events within Luna caps',
+      hint: 'Luna drops events past 32 per unique name / 256 per session, and needs an integer value for every string-named event. Fire them through plbx_html.log_event(name, value), after startGame() — Luna asks that nothing be logged during initialisation.',
+    })
+  }
 
   // game_end — required for Mintegral (gameEnd), Vungle (complete event)
   if (GAME_END_REQUIRED.has(networkId)) {

@@ -287,6 +287,26 @@ export const NETWORKS: Record<string, NetworkConfig> = {
     mraid: false,
     inlineAssets: true,
   },
+  luna: {
+    id: 'luna',
+    name: 'Luna (Unity Playworks)',
+    format: 'zip',
+    // Luna publishes no upload ceiling and does NOT compress or minify after
+    // upload ("please minify and obfuscate your playables prior to uploading"),
+    // so whatever we ship is what every downstream network gets. 5 MB is the
+    // strictest common cap among them — an artifact above it is dead on arrival
+    // at export time. Advisory; revise if Luna ever documents a real number.
+    maxSize: MB5,
+    // Luna injects the per-network SDK at export time, so our archive must carry
+    // no wrapper of its own. false here also makes 'mraid.js' a forbidden string
+    // (BaseAdapter.getForbiddenStrings), which is exactly what Luna wants.
+    mraid: false,
+    inlineAssets: true,
+    singleFileZip: true,
+    // Mandatory: Luna looks for source.html inside the archive.
+    htmlFileName: 'source.html',
+    zipStructure: '',
+  },
   yandex: {
     id: 'yandex',
     name: 'Yandex',

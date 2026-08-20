@@ -31,6 +31,10 @@ export interface NetworkConfig {
    *  match the playable filename (e.g. RISE_play036_01.html). Only meaningful
    *  with singleFileZip. Falls back to index.html when the basename is "index". */
   htmlMatchesZipName?: boolean
+  /** Literal name for the HTML inside the ZIP (e.g. Luna requires 'source.html',
+   *  its exporter looks for exactly that entry). Wins over htmlMatchesZipName
+   *  and, unlike it, never renames the outer .zip. */
+  htmlFileName?: string
   dualFormat?: boolean // whether the network supports both html and zip output
   launcherPayload?: LauncherPayloadConfig // launcher-payload format config
   /** Network whose validator requires a Google Play Store URL in the build (e.g. Unity
@@ -63,6 +67,10 @@ export interface PackageConfig {
   /** Asset-container encodings to emit (self-contained loader only). Default
    *  ['base64']. With both, base122 → primary `index.html`, base64 → sibling `.b64.html`. */
   assetEncodings?: ('base64' | 'base122')[]
+  /** Display name for targets that need it inside a manifest (Luna's
+   *  luna.json `applicationName` / playground.json `title`). Filled by the
+   *  packager from templateVariables when a caller left it empty. */
+  appName?: string
 }
 
 export interface AssetReportItem {

@@ -3,6 +3,7 @@ import { validateLauncher } from '../packager/launcher-builder'
 import { getNetwork } from '../networks'
 import type { ArtifactFileKind, CheckResult } from '../types'
 import { extractAxonUsage, validateAxonEvents } from './axon-events'
+import { extractLunaUsage, validateLunaEvents } from './luna-events'
 import {
   parseHostileMp3Marker,
   parseRiskyAudioMarker,
@@ -29,7 +30,7 @@ export interface ValidateArtifactInput {
   files: ArtifactFileCheckInput[]
   /**
    * Source dist directory, when available (packaging time). Enables
-   * source-scan checks (Axon event literals, store-URL regional params) that
+   * source-scan checks (Axon/Luna event literals, store-URL regional params) that
    * cannot run against the packed artifact alone; revalidation over S3
    * artifacts omits it and those checks are skipped.
    */
@@ -62,7 +63,7 @@ export function findForbiddenLiterals(
  * (spec §3 "validation" module). Composes the per-network static checks the
  * Cocos extension runs in its Validate window: size limits per file kind,
  * forbidden/required strings, loader health, launcher checks, audio markers,
- * store-URL presence, Axon events.
+ * store-URL presence, Axon/Luna events.
  */
 export function validateArtifact(input: ValidateArtifactInput): CheckResult[] {
   const network = getNetwork(input.networkId)
@@ -183,6 +184,26 @@ export function validateArtifact(input: ValidateArtifactInput): CheckResult[] {
               ? 'failed'
               : 'warning',
           details: axonCheck.ok ? null : (axonCheck.detail ?? null),
+        })
+      }
+    }
+
+    // Luna custom events — same dispatch as Axon. Static usage only, so the
+    // 32/256 caps are not among these rows (they need real fire counts; the
+    // preview panel computes them). 'info' rows are always ok:true and land as
+    // 'passed', which is what they are: a reported fact, not a verdict.
+    if (input.networkId === 'luna') {
+      const usage = extractLunaUsage(input.buildDir)
+      for (const lunaCheck of validateLunaEvents(usage)) {
+        checks.push({
+          id: `luna-${lunaCheck.id}`,
+          label: lunaCheck.label,
+          status: lunaCheck.ok
+            ? 'passed'
+            : lunaCheck.level === 'error'
+              ? 'failed'
+              : 'warning',
+          details: lunaCheck.ok ? null : (lunaCheck.detail ?? null),
         })
       }
     }

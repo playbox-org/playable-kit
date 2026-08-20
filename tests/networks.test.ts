@@ -120,6 +120,16 @@ describe('NETWORKS registry', () => {
     })
   })
 
+  it('luna is a single-file zip whose inner HTML is source.html', () => {
+    const n = getNetwork('luna')!
+    expect(n.format).toBe('zip')
+    expect(n.singleFileZip).toBe(true)
+    expect(n.inlineAssets).toBe(true)
+    expect(n.mraid).toBe(false)
+    expect(n.htmlFileName).toBe('source.html')
+    expect(n.maxSize).toBe(5 * 1024 * 1024)
+  })
+
   it('getAllNetworks should return all networks', () => {
     const all = getAllNetworks()
     expect(all.length).toBe(Object.keys(NETWORKS).length)

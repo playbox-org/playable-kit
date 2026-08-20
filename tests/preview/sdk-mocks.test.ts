@@ -375,7 +375,8 @@ interface LunaHarness {
 function runLunaMock(): LunaHarness {
   const clock = new VirtualClock()
   const posted: any[] = []
-  const listeners: Record<string, Function[]> = {}
+  type Listener = (evt: any) => void
+  const listeners: Record<string, Listener[]> = {}
 
   const sandbox: any = {
     console,
@@ -406,10 +407,10 @@ function runLunaMock(): LunaHarness {
   sandbox.XMLHttpRequest.prototype.open = function () {}
   sandbox.window = sandbox
   sandbox.self = sandbox
-  sandbox.addEventListener = (type: string, fn: Function) => {
+  sandbox.addEventListener = (type: string, fn: Listener) => {
     ;(listeners[type] ||= []).push(fn)
   }
-  sandbox.removeEventListener = (type: string, fn: Function) => {
+  sandbox.removeEventListener = (type: string, fn: Listener) => {
     listeners[type] = (listeners[type] || []).filter((f) => f !== fn)
   }
   sandbox.dispatchEvent = (evt: any) => {

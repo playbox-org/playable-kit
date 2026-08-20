@@ -79,6 +79,8 @@ never throws. Which events to fire is the project's decision.
 Rules that bite:
 
 - **256 events per session, 32 per unique event name.** Both are hard Luna caps.
+  A 10 s playtime funnel reaches the session cap at 42 minutes, so it needs no
+  ceiling of its own — but anything fired in a loop does.
 - Names must be non-empty and whitespace-free. `'level up'` is rejected;
   `'level_up'` is fine.
 - Do not log during initialisation — fire after `startGame()` has run.
@@ -102,12 +104,12 @@ declare const window: any;
  * luna:pause when the ad is backgrounded, and counting through it would inflate
  * the funnel against sessions the user never saw.
  *
- * Capped: Luna allows 256 events per session, and a funnel past a few minutes
- * tells you nothing new. 180 s = 18 events, well inside the budget.
+ * No cap of its own: Luna allows 256 events per session (and 32 per unique
+ * name), which at a 10 s step is 42 minutes — longer than any playable session
+ * lives, so an extra ceiling would only add code.
  */
 export class LunaPlaytime {
     private static readonly STEP_MS = 10_000;
-    private static readonly MAX_SECONDS = 180;
 
     private static timer: any = null;
     private static paused = false;
@@ -123,10 +125,6 @@ export class LunaPlaytime {
         LunaPlaytime.timer = setInterval(() => {
             if (LunaPlaytime.paused) return;
             LunaPlaytime.seconds += 10;
-            if (LunaPlaytime.seconds > LunaPlaytime.MAX_SECONDS) {
-                clearInterval(LunaPlaytime.timer);
-                return;
-            }
             LunaPlaytime.log('playtime_' + LunaPlaytime.seconds + 's');
         }, LunaPlaytime.STEP_MS);
     }

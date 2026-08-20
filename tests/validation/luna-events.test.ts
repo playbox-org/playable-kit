@@ -569,3 +569,34 @@ describe('call detection is anchored on an identifier boundary', () => {
     ).toEqual([])
   }, 60_000)
 })
+
+describe('Axon names fired through the Luna channel', () => {
+  // plbx_html.log_event exists only in a Luna build; ALPlayableAnalytics.trackEvent
+  // is AppLovin's and the packager never touches it. Both directions fail SILENTLY
+  // when confused: an Axon name sent through log_event lands in Luna as a
+  // meaningless custom event, and on an AppLovin build the same call is a no-op.
+  // Axon's own validator already errors on non-spec names, so only this direction
+  // needed a guard.
+  it('warns when an Axon spec name is logged as a Luna custom event', () => {
+    const checks = validateLunaEvents({
+      source: 'runtime',
+      events: [
+        { name: 'CHALLENGE_STARTED', count: 1 },
+        { name: 'playtime_10s', count: 1 },
+      ],
+    })
+    const c = checks.find((x) => x.id === 'axon_names')
+    expect(c).toBeDefined()
+    expect(c!.ok).toBe(false)
+    expect(c!.level).toBe('warn')
+    expect(c!.detail).toContain('CHALLENGE_STARTED')
+  })
+
+  it('stays silent when no Axon name is present', () => {
+    const checks = validateLunaEvents({
+      source: 'runtime',
+      events: [{ name: 'playtime_10s', count: 1 }],
+    })
+    expect(checks.find((x) => x.id === 'axon_names')).toBeUndefined()
+  })
+})

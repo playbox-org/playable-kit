@@ -1,6 +1,6 @@
 import * as fs from 'fs'
 import { join, extname } from 'path'
-import type { AxonCheck } from './axon-events'
+import { AXON_EVENTS, type AxonCheck } from './axon-events'
 
 /**
  * Luna / Unity Playworks analytics conformance.
@@ -261,6 +261,8 @@ function isIntegerish(raw: string | undefined, viaBridge = false): boolean {
  * Conditional rules only emit a check when their signal is actually available,
  * so the checklist carries no "n/a — pass" noise.
  */
+const AXON_EVENT_SET: ReadonlySet<string> = new Set(AXON_EVENTS)
+
 export function validateLunaEvents(usage: LunaEventUsage): LunaCheck[] {
   const checks: LunaCheck[] = []
   const { source, events, dynamicNames = 0, redefinesSdk, ctaViaInstall } = usage
@@ -349,6 +351,26 @@ export function validateLunaEvents(usage: LunaEventUsage): LunaCheck[] {
   }
 
   if (redefinesSdk !== undefined) checks.push(redefinitionCheck(redefinesSdk))
+
+  // Cross-wiring guard. plbx_html.log_event exists only in a Luna build and
+  // AppLovin's ALPlayableAnalytics.trackEvent is a different global the packager
+  // never touches — but both are "analytics events" to a reader, and confusing
+  // them fails silently in both directions: an Axon name sent through log_event
+  // lands in Luna as a meaningless custom event, and the same call on an
+  // AppLovin build is a no-op. Axon's own validator already errors on non-spec
+  // names, so only this direction was unguarded.
+  const axonNames = events.filter((e) => AXON_EVENT_SET.has(e.name))
+  if (axonNames.length > 0) {
+    checks.push({
+      id: 'axon_names',
+      label: 'No AppLovin Axon event names sent to Luna',
+      ok: false,
+      level: 'warn',
+      detail: `These are AppLovin Axon events, not Luna ones: ${axonNames
+        .map((e) => e.name)
+        .join(', ')}. Axon events go through ALPlayableAnalytics.trackEvent() and are AppLovin-only; sent here they become meaningless custom events and burn Luna's 256-per-session budget.`,
+    })
+  }
 
   if (dynamicNames > 0) {
     checks.push({

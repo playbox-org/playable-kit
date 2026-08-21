@@ -40,6 +40,11 @@ export class HtmlBuilder {
     this.$('body').append(`<script>${code}</script>\n`)
   }
 
+  /** Append raw markup at the end of <body>, unwrapped — for content that is not itself a single script (e.g. a marker comment plus its own <script>) */
+  injectBodyRaw(html: string): void {
+    this.$('body').append(`${html}\n`)
+  }
+
   /** Inject a <meta> tag into <head> */
   injectMeta(name: string, content: string): void {
     this.$('head').append(`<meta name="${name}" content="${content}">\n`)

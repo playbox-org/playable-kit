@@ -339,6 +339,25 @@ describe('startup version banner', () => {
   })
 })
 
+describe('telemetry slot', () => {
+  it('emits an empty telemetry slot after the network adapter has run', async () => {
+    const result = await packageForNetworks({
+      buildDir: MOCK_BUILD,
+      outputDir: PACK_OUTPUT,
+      networks: ['applovin'],
+      config: defaultConfig,
+      packagerVersion: '0.2.3',
+    })
+    const html = readFileSync(result.results[0].outputPath, 'utf-8')
+    expect(html).toContain('<!--plbx-telemetry:v1-->')
+    // After, not before: the slot is an extension point for code that wraps what
+    // the adapters installed, and a slot emitted earlier would wrap nothing.
+    expect(html.indexOf('window.plbx_html')).toBeLessThan(
+      html.indexOf('<!--plbx-telemetry:v1-->'),
+    )
+  })
+})
+
 describe('store URL <head> comment (validator parity with super-html)', () => {
   it('mirrors a PackageConfig store URL as a plaintext <head> comment', async () => {
     const result = await packageForNetworks({

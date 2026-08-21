@@ -43,6 +43,7 @@ import {
 import { extractAxonUsage, validateAxonEvents } from '../validation/axon-events'
 import { extractLunaUsage, validateLunaEvents } from '../validation/luna-events'
 import { buildVersionBanner } from './version-banner'
+import { telemetrySlot } from './telemetry-slot'
 import CleanCSS from 'clean-css'
 import { KIT_VERSION } from '../version'
 
@@ -220,6 +221,11 @@ export async function packageForNetworks(
 
       // Startup version banner + plaintext store-URL <head> comments (super-html parity).
       builder.injectBodyScript(versionBanner)
+
+      // Empty extension point for a telemetry patcher — after the adapter above
+      // so anything patched in wraps the bridge it installed rather than nothing.
+      builder.injectBodyRaw(telemetrySlot())
+
       for (const url of headStoreUrls) {
         builder.injectHeadComment(url)
       }

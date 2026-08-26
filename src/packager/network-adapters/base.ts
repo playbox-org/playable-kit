@@ -1,6 +1,23 @@
 import { HtmlBuilder } from '../html-builder'
 import { NetworkConfig, PackageConfig } from '../../types'
 
+/**
+ * An extra copy of the finished artifact that differs from the primary one by
+ * a `<head>` rewrite only — same payload, same inner filename, different
+ * archive name. Google Ads wants three ZIPs for one creative: an
+ * `ad.orientation`-both archive plus a fixed `ad.size` archive per orientation
+ * (what super-html ships). Everything is built once; each variant just swaps
+ * the meta tag, so the archives stay byte-identical apart from it.
+ */
+export interface ArtifactVariant {
+  /** Appended to the archive basename before the extension. '' = the primary. */
+  suffix: string
+  /** Appended to the network name in the result row (panel/report label). */
+  label?: string
+  /** Rewrite the finished single-file HTML for this variant. */
+  transformHtml(html: string): string
+}
+
 export interface NetworkAdapter {
   readonly networkId: string
   /** Apply network-specific transformations to the HTML */
@@ -25,6 +42,12 @@ export interface NetworkAdapter {
    * black screen in prod without any build-time signal.
    */
   getRequiredStrings(): string[]
+  /**
+   * Extra archives to emit for the same payload, differing only by a `<head>`
+   * rewrite (see ArtifactVariant). Default: the primary artifact alone.
+   * Only honoured on the single-file-ZIP path.
+   */
+  getArtifactVariants(config: PackageConfig): ArtifactVariant[]
   /**
    * Extra files to place in the ZIP next to the HTML. Default none.
    * `getZipConfig` owns the hard-coded `config.json`; this hook covers
@@ -552,6 +575,10 @@ export class BaseAdapter implements NetworkAdapter {
     _config: PackageConfig,
   ): Array<{ zipPath: string; content: string }> {
     return []
+  }
+
+  getArtifactVariants(_config: PackageConfig): ArtifactVariant[] {
+    return [{ suffix: '', transformHtml: (html) => html }]
   }
 
   getForbiddenStrings(): string[] {

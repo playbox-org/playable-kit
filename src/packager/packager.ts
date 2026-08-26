@@ -561,7 +561,6 @@ export async function packageForNetworks(
               options.buildDir,
             )
             outputPath = named.outputPath
-            writeFileSync(join(tempDir, named.innerHtmlName), finalHtml)
 
             const extraFiles: Array<{ zipPath: string; content: string }> = []
             const zipConfig = adapter.getZipConfig(packageConfig)
@@ -575,15 +574,48 @@ export async function packageForNetworks(
             // luna.json + playground.json). Default is an empty list.
             extraFiles.push(...adapter.getZipExtraFiles(packageConfig))
 
-            const zipResult = await buildZip({
-              sourceDir: tempDir,
-              outputPath,
-              prefix: network.zipStructure || '',
-              extraFiles,
-            })
+            // Usually one archive; Google also wants a fixed-orientation copy
+            // per orientation, which is the same payload with one <head> meta
+            // swapped (see ArtifactVariant). The heavy work — asset ZIP, base64,
+            // full HTML — is already done and shared across all of them.
+            const variants = adapter.getArtifactVariants(packageConfig)
+            for (const variant of variants) {
+              writeFileSync(
+                join(tempDir, named.innerHtmlName),
+                variant.transformHtml(finalHtml),
+              )
+              const variantOutputPath = variant.suffix
+                ? outputPath.replace(/(\.[^.\\/]+)$/, `${variant.suffix}$1`)
+                : outputPath
+              const zipResult = await buildZip({
+                sourceDir: tempDir,
+                outputPath: variantOutputPath,
+                prefix: network.zipStructure || '',
+                extraFiles,
+              })
 
-            outputPath = zipResult.outputPath
-            outputSize = zipResult.size
+              if (!variant.suffix) {
+                outputPath = zipResult.outputPath
+                outputSize = zipResult.size
+                continue
+              }
+              // Secondary archives get their own result row (same shape as the
+              // base64/base122 A/B siblings below) so the panel reports a size
+              // and a limit verdict for every file we actually ship.
+              const limit = maxSizeForFormat(network, format)
+              results.push({
+                networkId: `${networkId}${variant.suffix.replace(/^_/, '-')}`,
+                networkName: variant.label
+                  ? `${network.name} (${variant.label})`
+                  : network.name,
+                outputPath: zipResult.outputPath,
+                outputSize: zipResult.size,
+                maxSize: limit,
+                withinLimit: zipResult.size <= limit,
+                format,
+                warnings: warnings.length ? warnings : undefined,
+              })
+            }
             rmSync(tempDir, { recursive: true, force: true })
           } else {
             // Per-encoding emit (self-contained only). The chosen encoding writes the
@@ -682,7 +714,8 @@ export async function packageForNetworks(
           // filesystem "Index.html" IS index.html, so deleting afterwards would
           // remove the file we just wrote.
           const copiedIndexHtml = join(tempDir, 'index.html')
-          if (existsSync(copiedIndexHtml)) rmSync(copiedIndexHtml, { force: true })
+          if (existsSync(copiedIndexHtml))
+            rmSync(copiedIndexHtml, { force: true })
           writeFileSync(join(tempDir, plainNamed.innerHtmlName), zipBranchHtml)
 
           const extraFiles: Array<{ zipPath: string; content: string }> = []

@@ -195,21 +195,58 @@ describe('Network Adapters', () => {
       expect(html).toContain('exitapi.js')
     })
 
-    it('should inject ad-size meta for portrait', () => {
+    it('should declare both orientations regardless of config.orientation', () => {
       const adapter = getAdapter('google')
-      const builder = new HtmlBuilder(sampleHtml)
-      adapter.transform(builder, { ...defaultConfig, orientation: 'portrait' })
-      const html = builder.toHtml()
-      expect(html).toContain('ad-size')
-      expect(html).toContain('320x480')
+      for (const orientation of ['portrait', 'landscape'] as const) {
+        const builder = new HtmlBuilder(sampleHtml)
+        adapter.transform(builder, { ...defaultConfig, orientation })
+        expect(builder.toHtml()).toContain(
+          '<meta name="ad.orientation" content="portrait,landscape">',
+        )
+      }
     })
 
-    it('should inject ad-size meta for landscape', () => {
+    it('should emit three artifact variants swapping only the head meta', () => {
       const adapter = getAdapter('google')
       const builder = new HtmlBuilder(sampleHtml)
-      adapter.transform(builder, { ...defaultConfig, orientation: 'landscape' })
+      adapter.transform(builder, defaultConfig)
       const html = builder.toHtml()
-      expect(html).toContain('480x320')
+
+      const variants = adapter.getArtifactVariants(defaultConfig)
+      expect(variants.map((v) => v.suffix)).toEqual([
+        '',
+        '_portrait',
+        '_landscape',
+      ])
+
+      const [primary, portrait, landscape] = variants.map((v) =>
+        v.transformHtml(html),
+      )
+      expect(primary).toBe(html)
+      // Both tags: ad.orientation is what App campaigns read and it overrides
+      // ad.size, which stays for the older size-only surfaces.
+      expect(portrait).toContain(
+        '<meta name="ad.orientation" content="portrait">',
+      )
+      expect(portrait).toContain(
+        '<meta name="ad.size" content="width=320,height=480">',
+      )
+      expect(landscape).toContain(
+        '<meta name="ad.orientation" content="landscape">',
+      )
+      expect(landscape).toContain(
+        '<meta name="ad.size" content="width=480,height=320">',
+      )
+      // Only the two supported dimensions are ever declared — never the real canvas.
+      expect(portrait + landscape).not.toMatch(
+        /content="width=(?!320,height=480|480,height=320)/,
+      )
+      const strip = (h: string) =>
+        h.replace(/<meta name="ad\.(size|orientation)"[^>]*>/g, '')
+      for (const v of [portrait, landscape]) {
+        // Identical apart from the meta tags.
+        expect(strip(v)).toBe(strip(html))
+      }
     })
 
     it('should inject clickTag variable with Google macro default', () => {

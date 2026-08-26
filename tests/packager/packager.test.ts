@@ -118,9 +118,64 @@ describe('packageForNetworks', () => {
       networks: ['google'],
       config: defaultConfig,
     })
-    expect(result.results).toHaveLength(1)
-    expect(result.results[0].format).toBe('zip')
-    expect(result.results[0].outputPath).toContain('.zip')
+    // google ships three archives: both-orientations + one per fixed orientation
+    expect(result.results.map((r) => r.networkId).sort()).toEqual([
+      'google',
+      'google-landscape',
+      'google-portrait',
+    ])
+    for (const r of result.results) {
+      expect(r.format).toBe('zip')
+      expect(r.outputPath).toContain('.zip')
+      expect(existsSync(r.outputPath)).toBe(true)
+      expect(r.outputSize).toBeGreaterThan(0)
+    }
+    const byId = Object.fromEntries(
+      result.results.map((r) => [r.networkId, r.outputPath]),
+    )
+    expect(byId['google-portrait']).toContain('_portrait.zip')
+    expect(byId['google-landscape']).toContain('_landscape.zip')
+    expect(byId['google']).not.toContain('_portrait')
+  })
+
+  it('google orientation archives differ from the primary by the head meta only', async () => {
+    const result = await packageForNetworks({
+      buildDir: MOCK_BUILD,
+      outputDir: PACK_OUTPUT,
+      networks: ['google'],
+      config: defaultConfig,
+    })
+    const htmlOf = async (zipPath: string) => {
+      const zip = await JSZip.loadAsync(readFileSync(zipPath))
+      return zip.file('index.html')!.async('string')
+    }
+    const byId = Object.fromEntries(
+      result.results.map((r) => [r.networkId, r.outputPath]),
+    )
+    const [primary, portrait, landscape] = await Promise.all(
+      ['google', 'google-portrait', 'google-landscape'].map((id) =>
+        htmlOf(byId[id]),
+      ),
+    )
+    expect(primary).toContain(
+      '<meta name="ad.orientation" content="portrait,landscape">',
+    )
+    expect(portrait).toContain(
+      '<meta name="ad.orientation" content="portrait">',
+    )
+    expect(portrait).toContain(
+      '<meta name="ad.size" content="width=320,height=480">',
+    )
+    expect(landscape).toContain(
+      '<meta name="ad.orientation" content="landscape">',
+    )
+    expect(landscape).toContain(
+      '<meta name="ad.size" content="width=480,height=320">',
+    )
+    const strip = (h: string) =>
+      h.replace(/<meta name="ad\.(size|orientation)"[^>]*>/g, '')
+    expect(strip(portrait)).toBe(strip(primary))
+    expect(strip(landscape)).toBe(strip(primary))
   })
 
   it('should package for multiple networks', async () => {
@@ -130,8 +185,9 @@ describe('packageForNetworks', () => {
       networks: ['applovin', 'google', 'facebook'],
       config: defaultConfig,
     })
-    // facebook has dualFormat=true, so it produces 2 results (html + zip)
-    expect(result.results).toHaveLength(4)
+    // facebook has dualFormat=true → 2 results (html + zip);
+    // google emits 3 archives (both-orientations + portrait + landscape)
+    expect(result.results).toHaveLength(6)
     expect(result.totalTime).toBeGreaterThan(0)
   })
 

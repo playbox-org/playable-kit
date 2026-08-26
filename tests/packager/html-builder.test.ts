@@ -36,10 +36,10 @@ describe('HtmlBuilder', () => {
 
   it('should inject meta tag', () => {
     const builder = new HtmlBuilder(sampleHtml)
-    builder.injectMeta('ad-size', '320x480')
+    builder.injectMeta('ad.size', 'width=320,height=480')
     const html = builder.toHtml()
-    expect(html).toContain('name="ad-size"')
-    expect(html).toContain('content="320x480"')
+    expect(html).toContain('name="ad.size"')
+    expect(html).toContain('content="width=320,height=480"')
   })
 
   it('should inject inline script into body', () => {

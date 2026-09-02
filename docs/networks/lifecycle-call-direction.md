@@ -14,7 +14,7 @@ symptom is a hook that never runs — or one that runs at the wrong moment.
 | Network | Creative **calls** (we invoke) | Creative **defines** (they invoke) | Notes |
 |---|---|---|---|
 | **Mintegral / PlayTurbo** | `install()` §2, `gameEnd()` §3, `gameReady()` §4, `gameRetry()` §6 | `gameStart()` §5, `gameClose()` §7 | The two hooks are for the game: "starting the countdown, starting the background music" / "turn off this background music". Reached via `plbx_html.on_game_start` / `on_game_close`. See [mintegral-playturbo.md](mintegral-playturbo.md). |
-| **TikTok / Pangle** | `playableSDK.reportGameReady()`, `playableSDK.reportGameClose()`, `playableSDK.openAppStore()` | — | **No lifecycle is officially defined.** `gameReady`/`gameStart`/`gameClose` on TikTok are a Mintegral carryover — do not add them. CTA-only. |
+| **TikTok / Pangle** | `playableSDK.openAppStore()` — and nothing else | — | **No lifecycle exists.** Verified against the live SDK, not inferred: see below. |
 | **Bigo** | `gameReady()` — the **SDK's own** function | — | Calling it *fires* a `GAME_START` event. There is no creative-defined `gameStart` here; the same word is an event name, not a function you provide. |
 | **Luna / Unity Playworks** | `Luna.Unity.Playable.InstallFullGame()` | `startGame()` | Its own contract, and `startGame` additionally **gates boot** — the creative must not self-start. Not the same thing as Mintegral's `gameStart` despite the transposed name — see the next section. |
 | **MRAID networks** (AppLovin, Unity Ads, ironSource, …) | `mraid.open()` | `viewableChange` listener | Not `game*` at all; the defer-boot gate is `__plbx_pre_boot`. |
@@ -51,6 +51,51 @@ is not enough information to port anything between these two networks. A
 Mintegral-style dispatcher on Luna never boots the game; a Luna-style boot gate
 on Mintegral stalls the creative whenever PlayTurbo does not call `gameStart`
 (their desktop test tool, for one).
+
+## TikTok / Pangle have no lifecycle — verified, not assumed
+
+Three independent confirmations:
+
+1. **The live SDK.** `playable-sdk.js` (266 KB, HTTP 200 from
+   `sf16-muse-va.ibytedtos.com/obj/union-fe-nc-i18n/playable/sdk/playable-sdk.js`)
+   exposes **39 methods**. Zero occurrences of `gameReady`, `gameStart`,
+   `gameClose`, `gameEnd`, `gameRetry` — and zero of `reportGameReady` /
+   `reportGameClose`, which this kit used to call.
+2. **TikTok's spec:** "The accessing party does not need to call for the
+   download or page jump operations by themselves. These operations are handled
+   by the js-sdk." The only documented call is `window.openAppStore()`.
+3. The SDK emits its own playable telemetry (`playableShow`,
+   `startPlayPlayable`, `finishPlayPlayable`, `playableEnd`) with no hook for
+   the creative.
+
+What the SDK does expose, for anyone tempted to map a lifecycle onto it:
+`openAppStore`, `openApp`, `openAdLandPageLinks`, `isMuted`, `isPangle`,
+`isPrerender`, `getContextInfo`, `getPlayableSettingInfo`, `sendEvent`,
+`sendRealPlay`, `sendFirstFrameShow`, `sendPlayableReward`,
+`playableSendClickEvent`, `registerConvertArea`, `vibrate`, `shake`, … None of
+these is documented as a game-ready or game-end signal. **Do not guess a
+mapping** — a plausible-looking name is how the removed calls got here.
+
+### What was wrong
+
+```js
+// removed in 0.3.14
+window.plbx_html.game_ready = function() {
+  if (window.playableSDK && playableSDK.reportGameReady) { playableSDK.reportGameReady(); }
+};
+```
+
+The guard never passed in production, so `plbx.game_ready()` and
+`plbx.game_end()` were **silent no-ops** on TikTok and Pangle. The preview mock
+made it worse: its `decorate()` assigns a wrapper even when the real SDK has no
+such method, so listing a name in `BEACON` *manufactures* it. Both names were
+listed — preview reported the beacons, the checklist went green, and production
+did nothing. The checklist also carried `gameReady()` / `gameStart()` rows
+telling creators to call an API that does not exist.
+
+Now: CTA only, `BEACON` is CTA-only, and the checklist has no lifecycle rows for
+these two networks. `plbx.game_ready()` / `game_end()` still exist (the surface
+is uniform) and are honest no-ops.
 
 ## Why this keeps going wrong
 

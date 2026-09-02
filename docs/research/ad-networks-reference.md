@@ -134,7 +134,7 @@ Two official channels (do not conflate — this was a bug in the old doc):
 - **SDK:** `https://sf16-muse-va.ibytedtos.com/obj/union-fe-nc-i18n/playable/sdk/playable-sdk.js` — **all-lowercase path confirmed live (HTTP 200, ~263 KB SDK)**; every capitalized variant 404s. Place at bottom of `<body>` before developer JS.
 - **MRAID:** No — "should not be in mraid.js format."
 - **ZIP structure:** `index.html` + `config.json` at first level; assets folder allowed. `config.json` orientation 0/1/2; optional `playable_languages` array (Luna).
-- **Lifecycle:** **NONE officially defined.** The old `gameReady/gameStart/gameClose` sequence is an incorrect Mintegral carryover — remove it. Treat the adapter as CTA-only.
+- **Lifecycle:** **NONE.** Re-verified 2026-09-02 against the live `playable-sdk.js` (266 KB, HTTP 200): 39 methods, zero occurrences of `gameReady`/`gameStart`/`gameClose`/`gameEnd`/`gameRetry` and zero of `reportGameReady`/`reportGameClose`. TikTok's own spec: "The accessing party does not need to call for the download or page jump operations by themselves. These operations are handled by the js-sdk." Only `window.openAppStore()`. The SDK fires its own telemetry (`playableShow`, `startPlayPlayable`, `finishPlayPlayable`, `playableEnd`) with no creative-side hook. Adapter is CTA-only as of kit 0.3.14 — see `docs/networks/lifecycle-call-direction.md`.
 - **Blocked:** no external network material, no JS redirects, no HTTP requests. No official testing tool.
 
 ### Vungle (Liftoff Monetize) — Adaptive Creative — `high`

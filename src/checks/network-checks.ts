@@ -21,11 +21,22 @@ export const CTA_LABELS: Record<string, string> = {
 // Networks requiring full gameReady/gameStart/gameEnd/gameClose lifecycle
 const FULL_LIFECYCLE = new Set(['mintegral'])
 
-// Networks requiring gameReady + gameStart (SDK calls gameStart after gameReady)
-const PARTIAL_LIFECYCLE = new Set(['tiktok', 'pangle'])
+// Networks requiring gameReady + gameStart beyond the full set above.
+//
+// EMPTY on purpose. TikTok and Pangle used to sit here, which was a carryover
+// from Mintegral: their playable-sdk.js exposes 39 methods and NONE of them is
+// gameReady/gameStart/gameClose/reportGameReady/reportGameClose, and TikTok's
+// own spec says "The accessing party does not need to call for the download or
+// page jump operations by themselves. These operations are handled by the
+// js-sdk." Only window.openAppStore() is required. The rows told creators to
+// call an API that does not exist. See docs/networks/lifecycle-call-direction.md.
+const PARTIAL_LIFECYCLE = new Set<string>()
 
-// Networks where game_end/complete is explicitly validated
-const GAME_END_REQUIRED = new Set(['mintegral', 'vungle', 'tiktok', 'pangle'])
+// Networks where game_end/complete is explicitly validated.
+// TikTok/Pangle removed for the same reason: the SDK fires its own playable
+// lifecycle telemetry (playableShow, startPlayPlayable, finishPlayPlayable,
+// playableEnd) and gives the creative no call to make.
+const GAME_END_REQUIRED = new Set(['mintegral', 'vungle'])
 
 export interface CheckDef {
   id: string

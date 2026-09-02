@@ -533,20 +533,21 @@ describe('Network Adapters', () => {
       expect(html).toContain('playableSDK.openAppStore()')
     })
 
-    it('should bridge game_ready to playableSDK.reportGameReady()', () => {
+    // The live playable-sdk.js exposes 39 methods and has NEITHER
+    // reportGameReady nor reportGameClose. The bridge used to call both behind
+    // a typeof guard that never passed in production, so game_ready/game_end
+    // were silent no-ops — while the preview mock manufactured the methods and
+    // the checklist went green over dead code. TikTok's spec asks the creative
+    // for one call only: window.openAppStore().
+    it('does not call lifecycle methods the SDK has never had', () => {
       const adapter = getAdapter('tiktok')
       const builder = new HtmlBuilder(sampleHtml)
       adapter.transform(builder, defaultConfig)
       const html = builder.toHtml()
-      expect(html).toContain('playableSDK.reportGameReady')
-    })
-
-    it('should bridge game_end to playableSDK.reportGameClose()', () => {
-      const adapter = getAdapter('tiktok')
-      const builder = new HtmlBuilder(sampleHtml)
-      adapter.transform(builder, defaultConfig)
-      const html = builder.toHtml()
-      expect(html).toContain('playableSDK.reportGameClose')
+      expect(html).not.toContain('reportGameReady')
+      expect(html).not.toContain('reportGameClose')
+      // CTA is the one call the spec does require, and it stays.
+      expect(html).toContain('playableSDK.openAppStore()')
     })
 
     it('should inject viewport meta tag', () => {
@@ -619,20 +620,21 @@ describe('Network Adapters', () => {
       expect(html).toContain('playableSDK.openAppStore()')
     })
 
-    it('should bridge game_ready to playableSDK.reportGameReady()', () => {
+    // The live playable-sdk.js exposes 39 methods and has NEITHER
+    // reportGameReady nor reportGameClose. The bridge used to call both behind
+    // a typeof guard that never passed in production, so game_ready/game_end
+    // were silent no-ops — while the preview mock manufactured the methods and
+    // the checklist went green over dead code. TikTok's spec asks the creative
+    // for one call only: window.openAppStore().
+    it('does not call lifecycle methods the SDK has never had', () => {
       const adapter = getAdapter('pangle')
       const builder = new HtmlBuilder(sampleHtml)
       adapter.transform(builder, defaultConfig)
       const html = builder.toHtml()
-      expect(html).toContain('playableSDK.reportGameReady')
-    })
-
-    it('should bridge game_end to playableSDK.reportGameClose()', () => {
-      const adapter = getAdapter('pangle')
-      const builder = new HtmlBuilder(sampleHtml)
-      adapter.transform(builder, defaultConfig)
-      const html = builder.toHtml()
-      expect(html).toContain('playableSDK.reportGameClose')
+      expect(html).not.toContain('reportGameReady')
+      expect(html).not.toContain('reportGameClose')
+      // CTA is the one call the spec does require, and it stays.
+      expect(html).toContain('playableSDK.openAppStore()')
     })
 
     it('should inject viewport meta tag', () => {

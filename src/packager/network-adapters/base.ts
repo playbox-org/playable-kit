@@ -273,13 +273,27 @@ window.plbx_html.game_retry = function() { if (typeof window.gameRetry === 'func
   )
 }
 
-/** TikTok/Pangle bridge — uses playableSDK for CTA, gameReady, and gameClose */
+/**
+ * TikTok/Pangle bridge — CTA only.
+ *
+ * There is no lifecycle to wire. The live playable-sdk.js exposes 39 methods
+ * and none of them is gameReady/gameStart/gameClose/reportGameReady/
+ * reportGameClose, and TikTok's spec says the creative only calls
+ * `window.openAppStore()`: "The accessing party does not need to call for the
+ * download or page jump operations by themselves. These operations are handled
+ * by the js-sdk." The SDK emits its own playable telemetry (playableShow,
+ * startPlayPlayable, finishPlayPlayable, playableEnd) with no hook for us.
+ *
+ * game_ready/game_end used to call playableSDK.reportGameReady/reportGameClose
+ * behind a `typeof` guard. The guard never passed in production, so both were
+ * silent no-ops — while the preview mock manufactured the two methods and the
+ * checklist went green over dead code. They now take the base no-op, which is
+ * what the spec actually asks for.
+ */
 export function tiktokBridge(): string {
   return buildPlbxBridge(
     `if (window.playableSDK) { playableSDK.openAppStore(); } else if (url) { window.open(url, "_blank"); }`,
     [
-      `window.plbx_html.game_ready = function() { if (window.playableSDK && playableSDK.reportGameReady) { playableSDK.reportGameReady(); } };`,
-      `window.plbx_html.game_end = function() { if (window.playableSDK && playableSDK.reportGameClose) { playableSDK.reportGameClose(); } };`,
       // Game CTA dispatchers calling window.install()/window.open() directly must
       // route to playableSDK.openAppStore() — TikTok/Pangle track via the SDK.
       `window.install = function() { if (window.playableSDK && playableSDK.openAppStore) playableSDK.openAppStore(); };

@@ -838,18 +838,30 @@ export function generatePreviewUtil(params: PreviewUtilParams): string {
 
   // Phase 5: Lifecycle tracking
   parts.push(`
-  // Lifecycle tracking
+  // Lifecycle tracking.
+  //
+  // Direction matters and the names do not carry it. gameReady/gameEnd are
+  // defined HERE (container side) and called by the creative. gameStart and
+  // gameClose are the opposite: the creative defines them, the container calls
+  // them (PlayTurbo §5, §7 — "we will automatically call this function").
+  //
+  // This mock used to ASSIGN window.gameStart/gameClose to its own reporters,
+  // which is the container overwriting the creative's hooks. Whichever script
+  // ran last won: the checklist went green off the mock's own report while the
+  // creative's start/close logic never ran, or the creative's assignment
+  // silenced the report and the row stayed red for a correct build. Look the
+  // function up at call time instead, so injection order stops mattering.
+  function callCreativeHook(name, event) {
+    report(event, {});
+    var fn = window[name];
+    if (typeof fn === 'function') { try { fn(); } catch (e) {} }
+  }
   window.gameReady = function() {
     report('game_ready', {});
     // Simulate SDK behavior: call gameStart() after gameReady, like real validators do
-    setTimeout(function() {
-      if (typeof window.gameStart === 'function') {
-        try { window.gameStart(); } catch(e) {}
-      }
-    }, 100);
+    setTimeout(function() { callCreativeHook('gameStart', 'game_start'); }, 100);
   };
-  window.gameStart = function() { report('game_start', {}); };
-  window.gameClose = function() { report('game_close', {}); };
+  window.gameRetry = function() { report('game_retry', {}); };
   window.gameEnd = function() {${
     networkId === 'vungle'
       ? `
@@ -863,7 +875,11 @@ export function generatePreviewUtil(params: PreviewUtilParams): string {
     report('game_end', { method: 'window.gameEnd', warning: 'plbx_html bridge missing — Vungle would never receive complete' });
   `
       : ` report('game_end', {}); `
-  }};
+  }
+    // The container runs its close sequence once the playable reports the end,
+    // which is when the real one calls the creative's gameClose (§7).
+    setTimeout(function() { callCreativeHook('gameClose', 'game_close'); }, 100);
+  };
 
   // Signal load complete
   report('preview_loaded', { networkId: '${networkId}' });

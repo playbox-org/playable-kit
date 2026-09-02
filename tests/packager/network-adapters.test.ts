@@ -379,6 +379,60 @@ describe('Network Adapters', () => {
       expect(html).toContain('gameClose')
     })
 
+    // PlayTurbo §5/§7: the container calls the creative's gameStart/gameClose.
+    // They used to be guarded no-op stubs, so the call reached nothing and a
+    // game had no way to hook the spec's own use cases (start the countdown or
+    // the BGM; stop the BGM).
+    const mintegralHtml = () => {
+      const adapter = getAdapter('mintegral')
+      const builder = new HtmlBuilder(sampleHtml)
+      adapter.transform(builder, defaultConfig)
+      return builder.toHtml()
+    }
+
+    it('dispatches gameStart/gameClose to plbx_html subscribers', () => {
+      const html = mintegralHtml()
+      expect(html).toContain('window.plbx_html.on_game_start')
+      expect(html).toContain('window.plbx_html.on_game_close')
+      // not a stub any more
+      expect(html).not.toContain('window.gameClose = function() {};')
+    })
+
+    it('never calls gameClose itself — the container owns that timing', () => {
+      const html = mintegralHtml()
+      // download() ran the game's end-of-ad cleanup on a CTA tap; game_end()
+      // ran it a second time. Both invocations are gone.
+      const bridge = html.slice(
+        html.indexOf('download: function'),
+        html.indexOf('is_audio: function'),
+      )
+      expect(bridge).not.toContain('gameClose')
+      expect(bridge).toContain('window.gameEnd')
+    })
+
+    it('exposes game_retry for replay creatives (§6)', () => {
+      const html = mintegralHtml()
+      expect(html).toContain('game_retry')
+      expect(html).toContain('window.gameRetry')
+    })
+
+    it('keeps a game-assigned gameStart instead of hijacking it', () => {
+      // The spec's own example is `function gameStart() { … }` in the playable,
+      // so a game may already own the global by the time we install ours.
+      const html = mintegralHtml()
+      expect(html).toContain(
+        "var priorStart = typeof window.gameStart === 'function' ? window.gameStart : null",
+      )
+      expect(html).toContain('priorStart()')
+    })
+
+    it('calls a late subscriber immediately when the container already fired', () => {
+      // Cocos boots asynchronously — a scene subscribing in onLoad is routinely
+      // later than gameStart, and silently missing it is the original bug.
+      const html = mintegralHtml()
+      expect(html).toContain('if (fired) { try { cb(); } catch (e) {} }')
+    })
+
     it('should declare preview-util.js as forbidden string', () => {
       const adapter = getAdapter('mintegral')
       const forbidden = adapter.getForbiddenStrings()

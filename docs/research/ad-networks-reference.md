@@ -115,7 +115,7 @@ Two official channels (do not conflate — this was a bug in the old doc):
 - **Size:** **5 MB** max for the ZIP (or single HTML). All files except JS/HTML must be base64-inlined. — [Mintegral help center](https://helpcenter.mintegral.com/en/docs/asset-specs) (5M); ZIP wording from the JS-rendered [PlayTurbo /review/doc](https://www.playturbo.com/review/doc) (corroborated via search + [Luna](https://docs.lunalabs.io/docs/playable/ad-networks/mintegral/)).
 - **MRAID:** No.
 - **ZIP structure:** `name.zip` → `name/` → `name.html`, all three names **identical**; filenames `[A-Za-z0-9_]`; HTML must open via `file://`. **No config.json required** (PlayTurbo assigns config.json to TikTok specifically).
-- **Lifecycle:** `gameReady` (we call on load), `gameStart` (we define, SDK calls). `gameEnd`/`gameRetry`/`gameClose` are consistent with the standard Mindworks lifecycle but **could not be re-verified this pass** (JS-rendered source). Never overwrite validator lifecycle functions.
+- **Lifecycle:** re-verified 2026-09-02 by rendering the JS-built page. Creative **calls** `install` (§2), `gameEnd` (§3), `gameReady` (§4), `gameRetry` (§6, only if the playable has a replay). Container **calls** the creative's `gameStart` (§5) and `gameClose` (§7) — those two are hooks for the game ("starting the countdown, starting the background music" / "turn off this background music"), reached through `plbx_html.on_game_start` / `on_game_close`. Full table: `docs/networks/mintegral-playturbo.md`.
 - **Injection:** `window.install` + lifecycle fns are injected by the PlayTurbo preview env at runtime (unpredictable timing → **poll** for availability).
 - **Validator:** [PlayTurbo review](https://www.playturbo.com/review/) (formerly mindworks-creative.com).
 

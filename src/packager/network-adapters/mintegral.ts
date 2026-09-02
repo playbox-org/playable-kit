@@ -81,11 +81,4 @@ export class MintegralAdapter extends BaseAdapter {
     builder.injectBodyScript(mintegralLifecycle())
   }
 
-  // Mintegral PlayTurbo validator rejects creatives that mention its internal
-  // preview helper script anywhere in the HTML — even inside JS comments.
-  // See: https://playturbo.mintegral.com → "Rejected for technical error:
-  // Please remove the strings related to 'preview-util.js' from the comments."
-  getForbiddenStrings(): string[] {
-    return [...super.getForbiddenStrings(), 'preview-util.js', 'preview-util']
-  }
 }

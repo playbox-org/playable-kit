@@ -10,9 +10,14 @@ import {
 } from 'fs'
 import { join, relative, extname, dirname, basename } from 'path'
 import { HtmlBuilder } from './html-builder'
-import { getAdapter, FORBIDDEN_STRING_HINTS } from './network-adapters'
+import { getAdapter } from './network-adapters'
 import { buildZip } from './zip-builder'
-import { getNetwork, NETWORKS, maxSizeForFormat } from '../networks'
+import {
+  getNetwork,
+  NETWORKS,
+  maxSizeForFormat,
+  FORBIDDEN_STRING_HINTS,
+} from '../networks'
 import {
   PackageResult,
   OutputFormat,

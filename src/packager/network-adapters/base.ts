@@ -1,5 +1,6 @@
 import { HtmlBuilder } from '../html-builder'
 import { NetworkConfig, PackageConfig } from '../../types'
+import { forbiddenStringsFor } from '../../networks'
 
 /**
  * An extra copy of the finished artifact that differs from the primary one by
@@ -505,40 +506,6 @@ window.addEventListener('luna:unmute', function() { _plbx_luna_audio(false); });
   )
 }
 
-/**
- * Validator-forbidden substrings that apply to ONE network only, keyed by
- * network id. Merged into `BaseAdapter.getForbiddenStrings()`, so a hit aborts
- * that network's packaging (other networks are unaffected — the packager wraps
- * each one in its own try/catch).
- *
- * `window.top` — Unity Ads rejects a responsive playable on any occurrence:
- * "Your responsive playable is not allowed to use window.top". The scan is
- * static, so a dead reference is rejected exactly like a live one.
- */
-const NETWORK_FORBIDDEN_STRINGS: Record<string, string[]> = {
-  unity: ['window.top'],
-}
-
-/**
- * Remediation text attached to a forbidden-string hit, keyed by the substring.
- *
- * Most forbidden strings are OUR bug (a loader regression leaking `mraid.js`),
- * so the bare "aborting" message is enough — the fix is in this repo. The
- * Phaser `window.top` case is not: it comes from the game's engine build, and
- * the diagnosis is genuinely non-obvious, so the error carries the fix.
- */
-export const FORBIDDEN_STRING_HINTS: Record<string, string> = {
-  'window.top':
-    'Phaser attaches its pointer listeners to window.top by default. ' +
-    'Set `input: { windowEvents: false }` in the game config AND strip the ' +
-    'dead `window.top` literal from the bundle — the flag is read at runtime, ' +
-    'so bundlers keep the string either way and this static scan still fails. ' +
-    'Fixing only one of the two is wrong in both directions: strings without ' +
-    'the flag changes input behaviour, the flag without the strings still ' +
-    'gets rejected. Side effect: POINTER_UP_OUTSIDE stops firing — verify any ' +
-    'drag/swipe logic that depends on release outside the canvas.',
-}
-
 export class BaseAdapter implements NetworkAdapter {
   constructor(
     public readonly networkId: string,
@@ -616,16 +583,7 @@ export class BaseAdapter implements NetworkAdapter {
   }
 
   getForbiddenStrings(): string[] {
-    const extra = NETWORK_FORBIDDEN_STRINGS[this.networkId] ?? []
-    // Non-MRAID networks (Moloco, Facebook, Snapchat, …) run a naive substring
-    // scan over the raw HTML and reject the creative on any `mraid.js` hit —
-    // including inside a JS comment or a dead conditional ("Playable shouldn't
-    // include the 'mraid.js' function"). The emitted loader keeps the token
-    // split (see loader/shared.ts) and drops whole-line comments, but that is
-    // a convention someone can undo; this check turns a silent regression into
-    // a failed build.
-    if (!this.networkConfig.mraid) return [...extra, 'mraid.js']
-    return extra
+    return forbiddenStringsFor(this.networkId)
   }
 
   getRequiredStrings(): string[] {

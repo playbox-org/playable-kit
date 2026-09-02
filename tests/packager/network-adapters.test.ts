@@ -1,11 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import {
-  getAdapter,
-  FORBIDDEN_STRING_HINTS,
-} from '../../src/packager/network-adapters'
+import { getAdapter } from '../../src/packager/network-adapters'
 import { mraidDeferBootGate } from '../../src/packager/network-adapters/base'
 import { HtmlBuilder } from '../../src/packager/html-builder'
-import { NETWORKS } from '../../src/networks'
+import {
+  NETWORKS,
+  forbiddenStringsFor,
+  FORBIDDEN_STRING_HINTS,
+} from '../../src/networks'
 import { PackageConfig } from '../../src/types'
 
 const sampleHtml = `<!DOCTYPE html>
@@ -426,6 +427,30 @@ describe('Network Adapters', () => {
       for (const id of ['applovin', 'ironsource', 'adcolony']) {
         expect(getAdapter(id).getForbiddenStrings()).not.toContain('window.top')
       }
+    })
+
+    it('adapters and the checklist read the same list — no adapter overrides', () => {
+      // mintegral and molocoV2 used to override getForbiddenStrings(), which the
+      // fs-free checklist builder could not see. Both now live in the registry.
+      for (const id of Object.keys(NETWORKS)) {
+        expect(getAdapter(id).getForbiddenStrings()).toEqual(
+          forbiddenStringsFor(id),
+        )
+      }
+    })
+
+    it('keeps the network-specific lists that were adapter overrides', () => {
+      expect(getAdapter('mintegral').getForbiddenStrings()).toContain(
+        'preview-util.js',
+      )
+      expect(getAdapter('mintegral').getForbiddenStrings()).toContain('mraid.js')
+      expect(getAdapter('molocoV2').getForbiddenStrings()).toContain(
+        'connect.facebook.net',
+      )
+      // molocoV2 is mraid:true — its launcher ships the tag and must not forbid it.
+      expect(getAdapter('molocoV2').getForbiddenStrings()).not.toContain(
+        'mraid.js',
+      )
     })
 
     it('a forbidden string carrying a hint explains the fix', () => {

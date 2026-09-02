@@ -242,18 +242,6 @@ export class MolocoV2Adapter extends BaseAdapter {
     super.transform(builder, config)
   }
 
-  getForbiddenStrings(): string[] {
-    // Moloco v2.0 spec section 2.5 — payload must not call out to non-Moloco
-    // trackers. Guards against analytics SDKs accidentally pulled in by the game.
-    return [
-      'google-analytics.com',
-      'googletagmanager.com',
-      'doubleclick.net',
-      'facebook.net/en_US/fbevents.js',
-      'connect.facebook.net',
-    ]
-  }
-
   getRequiredStrings(): string[] {
     return [
       ...super.getRequiredStrings(),

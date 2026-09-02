@@ -43,4 +43,4 @@ export function getAdapter(networkId: string): NetworkAdapter {
   return new BaseAdapter(networkId, config)
 }
 
-export { NetworkAdapter, BaseAdapter, FORBIDDEN_STRING_HINTS } from './base'
+export { NetworkAdapter, BaseAdapter } from './base'

@@ -1,9 +1,6 @@
-import {
-  getAdapter,
-  FORBIDDEN_STRING_HINTS,
-} from '../packager/network-adapters'
+import { getAdapter } from '../packager/network-adapters'
 import { validateLauncher } from '../packager/launcher-builder'
-import { getNetwork } from '../networks'
+import { getNetwork, FORBIDDEN_STRING_HINTS } from '../networks'
 import type { ArtifactFileKind, CheckResult } from '../types'
 import { extractAxonUsage, validateAxonEvents } from './axon-events'
 import { extractLunaUsage, validateLunaEvents } from './luna-events'

@@ -65,3 +65,18 @@ Three.js — contain zero `window.top`.
 `grep -c` counts *lines*, and a production bundle is one line: it returns `1`
 where there are 7. Use `grep -o … | wc -l`. The packager's check is a substring
 scan (`html.includes`), so it is not affected — this trap is shell-side only.
+
+## Where the check runs
+
+Both paths read the same list (`forbiddenStringsFor` in `src/networks.ts`), so
+they cannot drift apart:
+
+- **Packaging** — `assertNoForbiddenStrings` aborts the Unity target.
+- **Preview checklist** — `getNetworkChecks` emits a `no_forbidden_literals`
+  row for any network with something to forbid. It used to be gated on
+  `!mraid` (back when `mraid.js` was the only forbidden string), which silently
+  skipped Unity. That gate is gone.
+
+The preview path matters for artifacts packaged by an OLDER kit that are still
+sitting in the output directory — packaging can no longer produce them, but the
+checklist still has to fail them.

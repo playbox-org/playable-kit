@@ -13,6 +13,34 @@ packager service, the CLI and the extension can share one implementation.
   (no `fs`/node deps; safe for browser bundles).
 - `@playbox-ai/playable-kit/types` — types only, zero runtime.
 
+## Lifecycle globals — check the direction first
+
+⚠️ A `game*` global's **name does not tell you who calls it**, and the same
+identifier means different things on different networks. Half are ours to call,
+half are ours to provide.
+
+| Network | Creative calls | Creative defines (network calls it) |
+|---|---|---|
+| Mintegral | `install`, `gameEnd`, `gameReady`, `gameRetry` | `gameStart`, `gameClose` |
+| Luna | `Luna.Unity.Playable.InstallFullGame` | `startGame` — **and it gates boot** |
+| TikTok / Pangle | `playableSDK.*` | — (no lifecycle exists) |
+| Bigo | `gameReady` — the SDK's own function, fires `GAME_START` | — |
+
+`gameStart` and `startGame` are not the same contract with the words swapped:
+Mintegral's is a hook on an already-running engine, Luna's is the boot gate.
+Getting it backwards throws nothing — the creative loads and the hook silently
+never runs, or the game never boots at all.
+
+**→ [`docs/networks/lifecycle-call-direction.md`](docs/networks/lifecycle-call-direction.md)** —
+full table, the failure modes, and the checklist for adding a new one.
+
+Game code subscribes to the container-called hooks through the bridge:
+
+```js
+window.plbx_html.on_game_start(function () { /* countdown, BGM */ })
+window.plbx_html.on_game_close(function () { /* stop BGM */ })
+```
+
 ## Commands
 
 - `pnpm build` — tsup dual ESM/CJS build into `dist/`.

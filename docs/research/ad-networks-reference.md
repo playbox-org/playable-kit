@@ -115,7 +115,7 @@ Two official channels (do not conflate — this was a bug in the old doc):
 - **Size:** **5 MB** max for the ZIP (or single HTML). All files except JS/HTML must be base64-inlined. — [Mintegral help center](https://helpcenter.mintegral.com/en/docs/asset-specs) (5M); ZIP wording from the JS-rendered [PlayTurbo /review/doc](https://www.playturbo.com/review/doc) (corroborated via search + [Luna](https://docs.lunalabs.io/docs/playable/ad-networks/mintegral/)).
 - **MRAID:** No.
 - **ZIP structure:** `name.zip` → `name/` → `name.html`, all three names **identical**; filenames `[A-Za-z0-9_]`; HTML must open via `file://`. **No config.json required** (PlayTurbo assigns config.json to TikTok specifically).
-- **Lifecycle:** `gameReady` (we call on load), `gameStart` (we define, SDK calls). `gameEnd`/`gameRetry`/`gameClose` are consistent with the standard Mindworks lifecycle but **could not be re-verified this pass** (JS-rendered source). Never overwrite validator lifecycle functions.
+- **Lifecycle:** re-verified 2026-09-02 by rendering the JS-built page. Creative **calls** `install` (§2), `gameEnd` (§3), `gameReady` (§4), `gameRetry` (§6, only if the playable has a replay). Container **calls** the creative's `gameStart` (§5) and `gameClose` (§7) — those two are hooks for the game ("starting the countdown, starting the background music" / "turn off this background music"), reached through `plbx_html.on_game_start` / `on_game_close`. Full table: `docs/networks/mintegral-playturbo.md`.
 - **Injection:** `window.install` + lifecycle fns are injected by the PlayTurbo preview env at runtime (unpredictable timing → **poll** for availability).
 - **Validator:** [PlayTurbo review](https://www.playturbo.com/review/) (formerly mindworks-creative.com).
 
@@ -334,7 +334,7 @@ The old doc treated the TikTok/Pangle SDK as one interchangeable URL. Verified r
 ## Critical Rules (cross-network)
 
 1. **Use the network's own CTA** — do not hard-redirect via `window.location`; most networks reject auto-redirect and first-tap redirect.
-2. **Never overwrite validator lifecycle functions** — `gameReady` is defined by the validator (Mintegral) and called by us; `gameStart` is defined by us and called by the validator.
+2. **Check the call direction per network before touching any `game*` global** — the name does not carry it, and the same identifier means different things on different networks. `gameReady`/`gameEnd`/`gameRetry` the creative CALLS; `gameStart`/`gameClose` the creative DEFINES and the container calls. Luna's `startGame` is a third thing again (a boot gate), and TikTok has no lifecycle at all. Full table and the traps: `docs/networks/lifecycle-call-direction.md`.
 3. **No external network requests** for most networks — inline assets (base64/data-URI). Exceptions with external assets: Snapchat (CDN), Adikteev (CDN JS/CSS), Yandex (separate files in ZIP).
 4. **Respect size ceilings — several are tight:** Chartboost 3 MB, GDT 3 MB, Yandex 3 MB (index < 500 KB), myTarget/Tapjoy 2 MB, Liftoff < 700 KB (no video).
 5. **Audio:** muted until first user interaction; muted on background/close. Yandex forbids audio/video clips entirely.

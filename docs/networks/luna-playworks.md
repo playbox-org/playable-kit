@@ -88,6 +88,12 @@ examples; `null` is accepted and is what we emit.
 
 ### 3.1 Deferred boot
 
+> **`startGame` is not Mintegral's `gameStart` with the words swapped.** Same
+> direction (creative defines, host calls), opposite job: this one **gates
+> boot**, Mintegral's is a hook for game logic on an already-running engine.
+> Side-by-side table:
+> [lifecycle-call-direction.md](lifecycle-call-direction.md).
+
 All startup must run inside a global `startGame()`; Luna calls it. The kit
 already has the generic gate `window.__plbx_pre_boot(go)` (consumed by
 `runtime-loader.ts`, today also used by the MRAID defer-boot gate), but

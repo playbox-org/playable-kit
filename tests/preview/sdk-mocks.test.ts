@@ -165,7 +165,39 @@ describe('generatePreviewUtil', () => {
     expect(code).toContain('gameStart')
     expect(code).toContain('gameClose')
     expect(code).toContain("report('game_ready'")
-    expect(code).toContain("report('game_start'")
+    expect(code).toContain("callCreativeHook('gameStart', 'game_start')")
+  })
+
+  // gameStart/gameClose are defined by the CREATIVE and called by the container
+  // (PlayTurbo §5, §7). The mock is the container. Assigning them here overwrote
+  // the creative's hooks: depending on injection order either the checklist went
+  // green off the mock's own report while the creative's start/close logic never
+  // ran, or the creative's assignment silenced the report and a correct build
+  // showed red. The mock must look them up at call time instead.
+  it('calls the creative gameStart/gameClose hooks instead of replacing them', () => {
+    const code = generatePreviewUtil({
+      networkId: 'mintegral',
+      mraid: false,
+      maxSize: 5 * 1024 * 1024,
+    })
+    expect(code).not.toMatch(/window\.gameStart\s*=/)
+    expect(code).not.toMatch(/window\.gameClose\s*=/)
+    expect(code).toContain("callCreativeHook('gameStart', 'game_start')")
+    expect(code).toContain("callCreativeHook('gameClose', 'game_close')")
+    // ...and it looks the function up when it fires, not when it is installed.
+    expect(code).toContain('var fn = window[name]')
+  })
+
+  // gameReady and gameEnd run the other way — the creative calls them, so the
+  // mock owns those globals and must keep assigning them.
+  it('still owns the container-side globals (gameReady, gameEnd)', () => {
+    const code = generatePreviewUtil({
+      networkId: 'mintegral',
+      mraid: false,
+      maxSize: 5 * 1024 * 1024,
+    })
+    expect(code).toMatch(/window\.gameReady\s*=/)
+    expect(code).toMatch(/window\.gameEnd\s*=/)
   })
 
   it('should mock dapi SDK for MRAID networks (ironSource)', () => {
@@ -236,7 +268,8 @@ describe('Vungle game_end goes through the bridge, not straight to the report', 
       mraid: false,
       maxSize: 5 * 1024 * 1024,
     })
-    expect(code).toContain(`window.gameEnd = function() { report('game_end', {}); }`)
+    expect(code).toContain(`report('game_end', {}); `)
+    expect(code).not.toContain('plbx_html bridge missing')
   })
 })
 

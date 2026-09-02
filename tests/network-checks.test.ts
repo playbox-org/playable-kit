@@ -42,11 +42,34 @@ describe('no_forbidden_literals check', () => {
     }
   })
 
-  it('is absent for MRAID networks and molocoV2', () => {
+  it('is absent for MRAID networks with nothing to forbid, and molocoV2', () => {
     const applovin = getNetworkChecks('applovin', true).map((c) => c.id)
     expect(applovin).not.toContain('no_forbidden_literals')
+    // molocoV2 returns early with its macro suite; its tracker-domain list is
+    // enforced at packaging only, and never reached the checklist.
     const molocoV2 = getNetworkChecks('molocoV2', true).map((c) => c.id)
     expect(molocoV2).not.toContain('no_forbidden_literals')
+  })
+
+  // The row used to be gated on `!mraid`, which silently dropped it for Unity —
+  // an MRAID network that forbids window.top. The gate is now "does this network
+  // forbid anything", so the preview checklist can't diverge from the packager.
+  it('exists for unity, an MRAID network with its own forbidden string', () => {
+    const check = getNetworkChecks('unity', true).find(
+      (c) => c.id === 'no_forbidden_literals',
+    )
+    expect(check).toBeDefined()
+    expect(check!.label).toContain('window.top')
+    expect(check!.hint).toContain('windowEvents')
+  })
+
+  it('lists a network-specific string alongside mraid.js (mintegral)', () => {
+    const check = getNetworkChecks('mintegral', false).find(
+      (c) => c.id === 'no_forbidden_literals',
+    )
+    expect(check).toBeDefined()
+    expect(check!.label).toContain('preview-util.js')
+    expect(check!.label).toContain('mraid.js')
   })
 })
 

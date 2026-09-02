@@ -339,3 +339,74 @@ export function getNetworksByFormat(format: OutputFormat): NetworkConfig[] {
 export function getAllNetworks(): NetworkConfig[] {
   return Object.values(NETWORKS)
 }
+
+/**
+ * Validator-forbidden substrings that apply to ONE network only, keyed by
+ * network id. Merged into `BaseAdapter.getForbiddenStrings()`, so a hit aborts
+ * that network's packaging (other networks are unaffected — the packager wraps
+ * each one in its own try/catch).
+ *
+ * `window.top` — Unity Ads rejects a responsive playable on any occurrence:
+ * "Your responsive playable is not allowed to use window.top". The scan is
+ * static, so a dead reference is rejected exactly like a live one.
+ */
+export const NETWORK_FORBIDDEN_STRINGS: Record<string, string[]> = {
+  // Unity Ads rejects a responsive playable on any occurrence — see above.
+  unity: ['window.top'],
+  // Mintegral PlayTurbo: "Please remove the strings related to 'preview-util.js'
+  // from the comments." A comment counts. https://playturbo.mintegral.com
+  mintegral: ['preview-util.js', 'preview-util'],
+  // Moloco v2.0 spec §2.5 — the payload must not call out to non-Moloco
+  // trackers. Guards against analytics SDKs the game pulled in by accident.
+  molocoV2: [
+    'google-analytics.com',
+    'googletagmanager.com',
+    'doubleclick.net',
+    'facebook.net/en_US/fbevents.js',
+    'connect.facebook.net',
+  ],
+}
+
+/**
+ * Remediation text attached to a forbidden-string hit, keyed by the substring.
+ *
+ * Most forbidden strings are OUR bug (a loader regression leaking `mraid.js`),
+ * so the bare "aborting" message is enough — the fix is in this repo. The
+ * Phaser `window.top` case is not: it comes from the game's engine build, and
+ * the diagnosis is genuinely non-obvious, so the error carries the fix.
+ */
+export const FORBIDDEN_STRING_HINTS: Record<string, string> = {
+  'window.top':
+    'Phaser attaches its pointer listeners to window.top by default. ' +
+    'Set `input: { windowEvents: false }` in the game config AND strip the ' +
+    'dead `window.top` literal from the bundle — the flag is read at runtime, ' +
+    'so bundlers keep the string either way and this static scan still fails. ' +
+    'Fixing only one of the two is wrong in both directions: strings without ' +
+    'the flag changes input behaviour, the flag without the strings still ' +
+    'gets rejected. Side effect: POINTER_UP_OUTSIDE stops firing — verify any ' +
+    'drag/swipe logic that depends on release outside the canvas.',
+}
+
+/**
+ * Every validator-forbidden substring for one network: the `mraid.js` rule that
+ * applies to all non-MRAID networks, plus that network's own entries.
+ *
+ * Lives here, not on the adapter, because the checklist builder
+ * (`checks/network-checks.ts`) has to know the same list and must stay
+ * fs-free — it is bundled into the preview panel. `BaseAdapter` delegates to
+ * this so the packaging abort and the preview checklist can never disagree.
+ */
+export function forbiddenStringsFor(networkId: string): string[] {
+  const extra = NETWORK_FORBIDDEN_STRINGS[networkId] ?? []
+  const config = NETWORKS[networkId]
+  // Non-MRAID networks (Moloco, Facebook, Snapchat, …) run a naive substring
+  // scan over the raw HTML and reject the creative on any `mraid.js` hit —
+  // including inside a JS comment or a dead conditional ("Playable shouldn't
+  // include the 'mraid.js' function"). The emitted loader keeps the token
+  // split (see loader/shared.ts) and drops whole-line comments, but that is
+  // a convention someone can undo; this turns a silent regression into a
+  // failed build.
+  if (config && !config.mraid) return [...extra, 'mraid.js']
+  return extra
+}
+

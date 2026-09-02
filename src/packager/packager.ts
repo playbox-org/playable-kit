@@ -12,7 +12,12 @@ import { join, relative, extname, dirname, basename } from 'path'
 import { HtmlBuilder } from './html-builder'
 import { getAdapter } from './network-adapters'
 import { buildZip } from './zip-builder'
-import { getNetwork, NETWORKS, maxSizeForFormat } from '../networks'
+import {
+  getNetwork,
+  NETWORKS,
+  maxSizeForFormat,
+  FORBIDDEN_STRING_HINTS,
+} from '../networks'
 import {
   PackageResult,
   OutputFormat,
@@ -795,10 +800,14 @@ function assertNoForbiddenStrings(
   if (!forbidden.length) return
   const found = forbidden.filter((needle) => html.includes(needle))
   if (found.length === 0) return
+  const hints = found
+    .map((needle) => FORBIDDEN_STRING_HINTS[needle])
+    .filter((hint): hint is string => Boolean(hint))
   throw new Error(
     `[${networkName}] Generated HTML contains validator-forbidden string(s): ` +
       found.map((s) => `"${s}"`).join(', ') +
-      `. This build would be rejected by the network validator — aborting.`,
+      `. This build would be rejected by the network validator — aborting.` +
+      (hints.length ? ` ${hints.join(' ')}` : ''),
   )
 }
 

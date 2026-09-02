@@ -1,6 +1,6 @@
 import { getAdapter } from '../packager/network-adapters'
 import { validateLauncher } from '../packager/launcher-builder'
-import { getNetwork } from '../networks'
+import { getNetwork, FORBIDDEN_STRING_HINTS } from '../networks'
 import type { ArtifactFileKind, CheckResult } from '../types'
 import { extractAxonUsage, validateAxonEvents } from './axon-events'
 import { extractLunaUsage, validateLunaEvents } from './luna-events'
@@ -117,7 +117,17 @@ export function validateArtifact(input: ValidateArtifactInput): CheckResult[] {
       id: 'forbidden-strings',
       label: 'No forbidden strings',
       status: forbidden.length ? 'failed' : 'passed',
-      details: forbidden.length ? `Found: ${forbidden.join(', ')}` : null,
+      details: forbidden.length
+        ? [
+            `Found: ${forbidden.join(', ')}`,
+            // Same remediation text the packager attaches when it aborts, so a
+            // revalidation over an already-uploaded artifact is as actionable
+            // as a failed build.
+            ...forbidden
+              .map((needle) => FORBIDDEN_STRING_HINTS[needle])
+              .filter((hint): hint is string => Boolean(hint)),
+          ].join(' ')
+        : null,
     })
 
     const missing = adapter

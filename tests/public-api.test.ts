@@ -46,6 +46,11 @@ const REQUIRED_EXPORTS = [
   // added in 0.3.9 — the extension's preview checklist repeats the same iOS
   // audio-risk call to action in its hints, and must not fork the wording
   'IOS_AUDIO_RISK_CTA',
+  // added in 0.3.11 — the extension's preview validator needs the same
+  // per-network forbidden list and remediation text the packager aborts on
+  'forbiddenStringsFor',
+  'NETWORK_FORBIDDEN_STRINGS',
+  'FORBIDDEN_STRING_HINTS',
 ] as const
 
 describe('public API barrel', () => {

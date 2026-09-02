@@ -28,6 +28,38 @@ describe('findForbiddenLiterals', () => {
     expect(findForbiddenLiterals('applovin', withTag)).toEqual([])
     expect(findForbiddenLiterals('nope', withTag)).toEqual([])
   })
+
+  // Unity Ads: "Your responsive playable is not allowed to use window.top".
+  // Phaser's input manager emits window.top unless input.windowEvents is off,
+  // and the flag is read at runtime, so the literal survives minification even
+  // when the option is disabled. Every occurrence sits on ONE minified line —
+  // the reason this scan must be substring-based, not line-based.
+  const phaserBundle =
+    '<html><body><script>' +
+    'var t={onMouseDownWindow:function(e){this.manager.onMouseDown(e)},' +
+    'onTouchStartWindow:function(e){this.manager.onTouchStart(e)}};' +
+    'a.game.config.inputWindowEvents&&(this.isTop?window.top:window)' +
+    '.addEventListener("mousedown",t.onMouseDownWindow,!1),' +
+    '(this.isTop?window.top:window).addEventListener("mouseup",t,!1),' +
+    '(this.isTop?window.top:window).removeEventListener("mousedown",t,!1);' +
+    '</script></body></html>'
+
+  it('catches window.top in a minified Phaser bundle for unity', () => {
+    expect(findForbiddenLiterals('unity', phaserBundle)).toEqual(['window.top'])
+  })
+
+  it('leaves the same bundle alone on every other network', () => {
+    for (const id of ['applovin', 'ironsource', 'adcolony', 'facebook']) {
+      expect(findForbiddenLiterals(id, phaserBundle)).not.toContain(
+        'window.top',
+      )
+    }
+  })
+
+  it('passes a unity artifact that has no window.top', () => {
+    const clean = '<html><body><script>window.addEventListener("x",f)</script></body></html>'
+    expect(findForbiddenLiterals('unity', clean)).toEqual([])
+  })
 })
 
 describe('validateArtifact', () => {

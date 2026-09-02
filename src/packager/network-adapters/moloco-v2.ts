@@ -133,6 +133,14 @@ window.plbx_html.tap = function() {
   if (taps === te) fireOnce('engagement');
   if (taps === tr) fireOnce('redirection');
 };
+// Same members buildPlbxBridge gives every other network. This bridge is
+// assembled piecewise (each method closes over the macro/beacon state), so it
+// cannot reuse the builder — but the surface a game sees must not differ.
+// Moloco has no container-fired start or close, so these take the defaults.
+window.plbx_html.game_retry = function() {};
+window.plbx_html.is_game_started = function() { return true; };
+window.plbx_html.on_game_start = function(cb) { if (typeof cb === 'function') { try { cb(); } catch(e) {} } };
+window.plbx_html.on_game_close = function(cb) { if (typeof cb !== 'function') return; };
 window.plbx_html.external_commands = window.plbx_html.external_commands || [];
 window.plbx_html.expose = function(name, fn, label) {
   if (typeof name !== 'string' || typeof fn !== 'function') return;

@@ -66,6 +66,17 @@ export interface NetworkAdapter {
  * This is the API that game code calls for download/redirect.
  * Each network routes these calls to the appropriate SDK.
  * Also aliased as `window.super_html` for backward compatibility.
+ *
+ * EVERY member below exists on EVERY network. A game is written once and
+ * packaged for 25+ targets, so a method that only some adapters define is a
+ * TypeError on the rest — the game cannot feature-detect what it does not know
+ * is optional. Adapters may make a member *do* more (Mintegral's on_game_start
+ * waits for the container; Luna's on_mute_change reports real state), never
+ * make it disappear. `tests/packager/plbx-html-surface.test.ts` enforces this.
+ *
+ * The subscribe-style members (`on_*`) call a late subscriber immediately when
+ * the event has already happened, so game code never has to care whether it
+ * registered before or after. Cocos boots asynchronously, so it usually did not.
  */
 function buildPlbxBridge(downloadBody: string, extras?: string): string {
   return `window.plbx_html = window.plbx_html || {
@@ -77,9 +88,24 @@ function buildPlbxBridge(downloadBody: string, extras?: string): string {
   },
   game_end: function() {},
   game_ready: function() {},
+  // §6 on Mintegral (window.gameRetry); nothing to report to elsewhere.
+  game_retry: function() {},
   is_audio: function() { return true; },
   is_hide_download: function() { return false; },
   is_muted: function() { return false; },
+  // Default: the ad starts when the creative runs. Only Mintegral has a
+  // separate container-fired start (window.gameStart, §5), and its adapter
+  // replaces these two. Everywhere else — including the networks that gate boot
+  // (Luna's startGame, the MRAID defer-boot gate) — any game code able to
+  // subscribe is already past the start, so firing immediately is the truth.
+  is_game_started: function() { return true; },
+  on_game_start: function(cb) { if (typeof cb === 'function') { try { cb(); } catch (e) {} } },
+  // Fires only where the container signals the end of the ad (Mintegral §7
+  // today). Registering elsewhere is harmless and keeps game code portable.
+  on_game_close: function(cb) { if (typeof cb !== 'function') return; },
+  // Luna reports real mute state through this; elsewhere the container never
+  // changes it, so a subscriber gets the current value once and nothing more.
+  on_mute_change: function(cb) { if (typeof cb === 'function') { try { cb(this.is_muted()); } catch (e) {} } },
   report: function() {},
   tap: function() {},
   external_commands: [],
@@ -219,6 +245,31 @@ window.open = function(u) {
   try { return _plbxOrigOpen.apply(window, arguments); } catch(e) { return null; }
 };`,
     ].join('\n'),
+  )
+}
+
+/**
+ * Mintegral bridge — CTA through window.install() (§2: the playable must never
+ * redirect itself).
+ *
+ * Lives here, built from buildPlbxBridge like every other bridge. It used to be
+ * hand-rolled in mintegral.ts and had drifted: game_ready, is_muted, report and
+ * tap were simply absent, so a game calling any of them threw on Mintegral and
+ * nowhere else.
+ *
+ * gameStart/gameClose are NOT here — they are container-called hooks with their
+ * own dispatchers (see mintegralLifecycle). game_end and game_retry are the
+ * creative→container direction and belong on the bridge.
+ */
+export function mintegralBridge(): string {
+  return buildPlbxBridge(
+    `if (window.install) { window.install(); }
+    else if (url) {
+      var ua = navigator.userAgent || "";
+      /iPhone/i.test(ua) ? window.location.href = url : window.open(url, "_blank");
+    }`,
+    `window.plbx_html.game_end = function() { if (typeof window.gameEnd === 'function') { try { window.gameEnd(); } catch(e) {} } };
+window.plbx_html.game_retry = function() { if (typeof window.gameRetry === 'function') { try { window.gameRetry(); } catch(e) {} } };`,
   )
 }
 

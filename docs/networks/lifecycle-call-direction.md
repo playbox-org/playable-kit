@@ -86,6 +86,43 @@ function callCreativeHook(name, event) {
 }
 ```
 
+## `plbx_html` is ONE API on every network
+
+A game is written once and packaged for 25+ targets. It cannot feature-detect a
+member it never knew was optional, so **every member exists on every network** —
+an adapter may make one *do* more, never make it disappear.
+
+| Member | Default | Network-specific behaviour |
+|---|---|---|
+| `download(url)` | — | each adapter routes to its own CTA |
+| `game_end()` | no-op | Mintegral → `window.gameEnd`; TikTok → `playableSDK.reportGameClose`; Vungle → `postMessage('complete')`; Moloco V2 → `complete` beacon |
+| `game_ready()` | no-op | TikTok → `playableSDK.reportGameReady`; Moloco V2 → `game_viewable` beacon |
+| `game_retry()` | no-op | Mintegral → `window.gameRetry` (§6) |
+| `is_game_started()` | `true` | Mintegral: false until the container fires `gameStart` |
+| `on_game_start(cb)` | fires **immediately** | Mintegral: waits for the container's `gameStart` (§5) |
+| `on_game_close(cb)` | registers, never fires | Mintegral: the container's `gameClose` (§7) |
+| `is_muted()` / `on_mute_change(cb)` | `false`, one immediate call | Luna: real container mute state |
+| `is_audio()`, `is_hide_download()`, `report()`, `tap()`, `expose()` | defaults | Moloco V2 wires `report`/`tap` to its macro beacons |
+
+`on_game_start` firing immediately by default is not a fudge: on every network
+except Mintegral there is no separate container start, and on the ones that gate
+boot (Luna's `startGame`, the MRAID defer-boot gate) any game code able to
+subscribe is already past it. Mintegral is the one place where the start is a
+genuinely later event.
+
+**This drifted twice before it was caught**, both times invisibly:
+
+- the Mintegral bridge was hand-rolled instead of built from `buildPlbxBridge`
+  and silently lacked `game_ready`, `is_muted`, `report` and `tap` — a game
+  calling any of them threw on Mintegral and nowhere else;
+- the container-hook subscriptions were added to Mintegral alone, so
+  `on_game_start` was a TypeError on the other 29 networks.
+
+`tests/packager/plbx-html-surface.test.ts` now executes each network's emitted
+bridge and asserts the full member list, so a new adapter cannot ship a narrower
+API. Add the member to `buildPlbxBridge` — and to the piecewise Moloco V2
+bridge, which cannot use the builder — not to one adapter.
+
 ## Checklist for adding or changing a lifecycle global
 
 1. **Find the direction in the network's own spec**, not by analogy with another

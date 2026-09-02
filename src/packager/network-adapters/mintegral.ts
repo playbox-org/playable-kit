@@ -1,67 +1,9 @@
 import { HtmlBuilder } from '../html-builder'
 import { NetworkConfig, PackageConfig } from '../../types'
-import { BaseAdapter } from './base'
+import { BaseAdapter, mintegralBridge } from './base'
 
 const MINTEGRAL_VIEWPORT =
   'width=device-width,user-scalable=no,initial-scale=1.0,minimum-scale=1.0,maximum-scale=1.0'
-
-/**
- * Build Mintegral-specific plbx_html bridge.
- *
- * The PlayTurbo lifecycle has TWO directions, and the names alone do not say
- * which (https://www.playturbo.com/review/doc):
- *
- *   creative CALLS  → window.install()   CTA (§2)
- *                     window.gameEnd()   playable won/lost (§3)
- *                     window.gameReady() assets loaded (§4)
- *                     window.gameRetry() replay initiated (§6, only if the
- *                                        playable offers a replay)
- *   creative DEFINES ← window.gameStart() "we will automatically call this
- *                                        function at the beginning" (§5)
- *                     window.gameClose() "we will automatically call this
- *                                        function at the end" (§7)
- *
- * The two DEFINES are hooks for the game — the spec's own examples are
- * "starting the countdown, starting the background music" and "turn off this
- * background music". Games reach them through plbx_html.on_game_start /
- * on_game_close rather than by assigning the globals, so the packager keeps
- * ownership of the global and a game can subscribe at any point in its boot.
- *
- * Do NOT call gameClose() from download() or game_end(): the container owns
- * that timing. Calling it on a CTA tap ran the game's end-of-ad cleanup in the
- * middle of the ad — with the spec's own example hook, that killed the music.
- */
-function mintegralBridge(): string {
-  return `window.plbx_html = window.plbx_html || {
-  google_play_url: "",
-  appstore_url: "",
-  download: function(url) {
-    url = url || this.google_play_url || this.appstore_url || "";
-    if (window.install) { window.install(); }
-    else if (url) {
-      var ua = navigator.userAgent || "";
-      /iPhone/i.test(ua) ? window.location.href = url : window.open(url, "_blank");
-    }
-  },
-  game_end: function() {
-    if (typeof window.gameEnd === 'function') { try { window.gameEnd(); } catch(e) {} }
-  },
-  game_retry: function() {
-    if (typeof window.gameRetry === 'function') { try { window.gameRetry(); } catch(e) {} }
-  },
-  is_audio: function() { return true; },
-  is_hide_download: function() { return false; },
-  external_commands: [],
-  expose: function(name, fn, label) {
-    if (typeof name !== 'string' || typeof fn !== 'function') return;
-    this[name] = fn;
-    for (var i = 0; i < this.external_commands.length; i++) { if (this.external_commands[i].name === name) return; }
-    this.external_commands.push({ name: name, label: label || name });
-    try { parent.postMessage({ type: 'plbx:command', name: name, label: label || name }, '*'); } catch (e) {}
-  }
-};
-window.super_html = window.super_html || window.plbx_html;`
-}
 
 /**
  * Mintegral's two container-called hooks, wired to plbx_html subscribers.

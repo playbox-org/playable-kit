@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import { getAdapter } from '../../src/packager/network-adapters'
-import { mraidDeferBootGate } from '../../src/packager/network-adapters/base'
+import {
+  mraidDeferBootGate,
+  mintegralBridge,
+} from '../../src/packager/network-adapters/base'
 import { HtmlBuilder } from '../../src/packager/html-builder'
 import {
   NETWORKS,
@@ -399,15 +402,13 @@ describe('Network Adapters', () => {
     })
 
     it('never calls gameClose itself — the container owns that timing', () => {
-      const html = mintegralHtml()
       // download() ran the game's end-of-ad cleanup on a CTA tap; game_end()
-      // ran it a second time. Both invocations are gone.
-      const bridge = html.slice(
-        html.indexOf('download: function'),
-        html.indexOf('is_audio: function'),
-      )
+      // ran it a second time. The bridge must not mention gameClose at all —
+      // only the dispatcher in mintegralLifecycle owns that global.
+      const bridge = mintegralBridge()
       expect(bridge).not.toContain('gameClose')
       expect(bridge).toContain('window.gameEnd')
+      expect(bridge).toContain('window.gameRetry')
     })
 
     it('exposes game_retry for replay creatives (§6)', () => {

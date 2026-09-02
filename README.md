@@ -41,6 +41,12 @@ window.plbx_html.on_game_start(function () { /* countdown, BGM */ })
 window.plbx_html.on_game_close(function () { /* stop BGM */ })
 ```
 
+`plbx_html` is the **same API on every network** — a game is packaged for 25+
+targets and cannot feature-detect a member it never knew was optional. Adapters
+make members *do* more, never make them disappear; `on_game_start` simply fires
+immediately where no container start exists. Enforced by
+`tests/packager/plbx-html-surface.test.ts`.
+
 ## Commands
 
 - `pnpm build` — tsup dual ESM/CJS build into `dist/`.

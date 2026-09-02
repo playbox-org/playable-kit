@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import { getAdapter } from '../../src/packager/network-adapters'
+import {
+  getAdapter,
+  FORBIDDEN_STRING_HINTS,
+} from '../../src/packager/network-adapters'
 import { mraidDeferBootGate } from '../../src/packager/network-adapters/base'
 import { HtmlBuilder } from '../../src/packager/html-builder'
 import { NETWORKS } from '../../src/networks'
@@ -402,10 +405,35 @@ describe('Network Adapters', () => {
       }
     })
 
-    it('MRAID adapters declare no forbidden strings — they must ship mraid.js', () => {
-      for (const id of ['applovin', 'unity']) {
-        expect(getAdapter(id).getForbiddenStrings()).toEqual([])
+    it('MRAID adapters never forbid mraid.js — they must ship it', () => {
+      for (const id of ['applovin', 'unity', 'ironsource']) {
+        expect(getAdapter(id).getForbiddenStrings()).not.toContain('mraid.js')
       }
+    })
+
+    it('applovin declares no forbidden strings', () => {
+      expect(getAdapter('applovin').getForbiddenStrings()).toEqual([])
+    })
+
+    // Unity Ads rejects a responsive playable on any window.top occurrence.
+    // Phaser's input manager emits it by default, so a Phaser build reaches
+    // upload looking fine and comes back rejected — this fails it at packaging.
+    it('unity forbids window.top on top of the MRAID defaults', () => {
+      expect(getAdapter('unity').getForbiddenStrings()).toEqual(['window.top'])
+    })
+
+    it('window.top is forbidden for unity only, not for every MRAID network', () => {
+      for (const id of ['applovin', 'ironsource', 'adcolony']) {
+        expect(getAdapter(id).getForbiddenStrings()).not.toContain('window.top')
+      }
+    })
+
+    it('a forbidden string carrying a hint explains the fix', () => {
+      // The bare "aborting" message is a dead end for window.top: the fix is in
+      // the game's engine config, not in this repo.
+      const hint = FORBIDDEN_STRING_HINTS['window.top']
+      expect(hint).toContain('windowEvents')
+      expect(hint).toContain('POINTER_UP_OUTSIDE')
     })
   })
 

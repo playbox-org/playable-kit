@@ -62,15 +62,13 @@ creative's assignment silenced the report and a correct build showed red.
 
 ## Do not copy this to other networks
 
-Same names, different contracts:
+Same names, different contracts — TikTok has no lifecycle at all, Bigo's
+`gameReady` is the SDK's own function firing a `GAME_START` event, and Luna's
+`startGame` is a boot gate, not Mintegral's `gameStart` with the words swapped.
 
-- **TikTok** — no lifecycle is officially defined at all; `gameReady`/
-  `gameStart`/`gameClose` there are a Mintegral carryover (see
-  `docs/research/ad-networks-reference.md`). CTA-only.
-- **Bigo** — `gameReady()` is the SDK's own function and *fires* a `GAME_START`
-  event; there is no creative-defined `gameStart`.
-- **Luna** — its own contract: all startup lives in `window.startGame()`, which
-  Luna calls, and it gates boot (see `luna-playworks.md`).
+**→ [lifecycle-call-direction.md](lifecycle-call-direction.md)** is the
+cross-network table and the rules for adding a new one. Read it before touching
+any `game*` global.
 
 ## Other rules worth knowing (same page)
 

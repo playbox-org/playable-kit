@@ -1,0 +1,115 @@
+# Lifecycle call direction — read this before touching any `game*` global
+
+> **The rule:** a lifecycle global's name tells you nothing about who calls it.
+> The same identifier means a different thing on different networks. Look the
+> direction up per network, every time.
+
+Half of these globals are ours to **call**. The other half are ours to
+**provide**, and the network calls them. Get it backwards and nothing throws:
+the packaged creative loads, the checklist can even go green, and the only
+symptom is a hook that never runs — or one that runs at the wrong moment.
+
+## Direction by network
+
+| Network | Creative **calls** (we invoke) | Creative **defines** (they invoke) | Notes |
+|---|---|---|---|
+| **Mintegral / PlayTurbo** | `install()` §2, `gameEnd()` §3, `gameReady()` §4, `gameRetry()` §6 | `gameStart()` §5, `gameClose()` §7 | The two hooks are for the game: "starting the countdown, starting the background music" / "turn off this background music". Reached via `plbx_html.on_game_start` / `on_game_close`. See [mintegral-playturbo.md](mintegral-playturbo.md). |
+| **TikTok / Pangle** | `playableSDK.reportGameReady()`, `playableSDK.reportGameClose()`, `playableSDK.openAppStore()` | — | **No lifecycle is officially defined.** `gameReady`/`gameStart`/`gameClose` on TikTok are a Mintegral carryover — do not add them. CTA-only. |
+| **Bigo** | `gameReady()` — the **SDK's own** function | — | Calling it *fires* a `GAME_START` event. There is no creative-defined `gameStart` here; the same word is an event name, not a function you provide. |
+| **Luna / Unity Playworks** | `Luna.Unity.Playable.InstallFullGame()` | `startGame()` | Its own contract, and `startGame` additionally **gates boot** — the creative must not self-start. Not the same thing as Mintegral's `gameStart` despite the transposed name — see the next section. |
+| **MRAID networks** (AppLovin, Unity Ads, ironSource, …) | `mraid.open()` | `viewableChange` listener | Not `game*` at all; the defer-boot gate is `__plbx_pre_boot`. |
+| **Vungle** | `parent.postMessage('download'\|'complete')` | — | No globals; `download` and `complete` must never fire together. |
+
+## `gameStart` vs `startGame` — two words, swapped, opposite contracts
+
+The single easiest mistake in this file. Both are defined by the creative and
+called by the host, so the direction matches — and everything else does not.
+
+| | `gameStart` — Mintegral | `startGame` — Luna |
+|---|---|---|
+| Defined by | the creative | the creative |
+| Called by | PlayTurbo container, "at the beginning of the playable" (§5) | the Luna host, at page `load` |
+| **Gates boot?** | **No.** The engine is already running; this is a hook for game logic | **Yes.** *All* startup runs inside it; the creative must not self-start |
+| Purpose | start the countdown, start the BGM | boot the game |
+| When it must exist | any time before the container calls it | **synchronously at injection time** — Luna calls it at `load` |
+| If it never fires | countdown/BGM never start; the ad still plays | the creative never boots — splash for the whole impression |
+| Called more than once | dispatches to subscribers each time | must be idempotent (`_plbx_luna_started` guard) |
+| Self-start fallback | not applicable | yes, when `window.Luna` is absent (local dev) |
+| Kit entry point | `plbx_html.on_game_start(cb)` | the packager owns it; game code does not touch it |
+
+**The measured trap on the Luna side:** `startGame` must NOT be defined inside
+`__plbx_pre_boot`, because the runtime loader only calls that after unpacking
+the asset payload. On a packaged 3.5 MB artifact in headless Chromium
+`startGame` did not exist at `load` (t=186 ms) and first appeared at t=274 ms —
+a gap that grows with build size. Luna calls `startGame()` at `load`, gets
+`startGame is not a function`, and because `window.Luna` is present the
+self-start fallback is off: the creative sits on the splash for the entire
+impression. Details in [luna-playworks.md](luna-playworks.md) §3.1.
+
+**Consequence for review:** "we define a start function and the host calls it"
+is not enough information to port anything between these two networks. A
+Mintegral-style dispatcher on Luna never boots the game; a Luna-style boot gate
+on Mintegral stalls the creative whenever PlayTurbo does not call `gameStart`
+(their desktop test tool, for one).
+
+## Why this keeps going wrong
+
+**A guard that protects nothing.** This shape looks defensive:
+
+```js
+if (typeof window.gameStart !== 'function') window.gameStart = function () {}
+```
+
+It reads as "don't overwrite the validator's function". But for a
+container-**calls** hook there is nothing to overwrite — the container never
+defines it, it only invokes it. The guard silently installs a dead stub and
+hides the fact that no hook exists. That is exactly what shipped for Mintegral
+until 0.3.12.
+
+**Calling a hook we were supposed to provide.** `plbx_html.download()` used to
+invoke `window.gameClose()`. `gameClose` is the game's end-of-ad cleanup, and
+the container owns its timing — so a CTA tap ran the cleanup mid-ad and, with
+the spec's own example hook, stopped the music.
+
+**A preview mock that assigns instead of calls.** The mock *is* the container.
+Assigning `window.gameStart` there overwrites the creative's hook; whichever
+script ran last won. Either the checklist went green off the mock's own report
+while the creative's hook never ran, or the creative's assignment silenced the
+report and a correct build showed red. A mock must look the hook up **at call
+time**:
+
+```js
+function callCreativeHook(name, event) {
+  report(event, {})
+  var fn = window[name]                 // resolved when it fires, not when installed
+  if (typeof fn === 'function') { try { fn() } catch (e) {} }
+}
+```
+
+## Checklist for adding or changing a lifecycle global
+
+1. **Find the direction in the network's own spec**, not by analogy with another
+   network. Quote the sentence in the adapter comment.
+2. Creative **calls** it → wire it through `plbx_html.<verb>()` so game code has
+   one entry point, and forward with a `typeof` check.
+3. Creative **defines** it → the packager owns the global and dispatches to
+   `plbx_html.on_<event>(cb)` subscribers. Requirements that are easy to miss:
+   - a subscriber registering **after** the event already fired must be called
+     immediately — Cocos boots asynchronously, so a scene subscribing in
+     `onLoad` is routinely later than the container's call;
+   - one throwing subscriber must not skip the rest;
+   - a pre-existing global assigned by the game must be preserved and called
+     first, not clobbered.
+4. **Do not generalise across networks.** Add it to the per-network map, not to
+   the shared loader.
+5. **Test by execution, not by grep.** String assertions prove the code was
+   emitted, not that the wiring works. `tests/packager/mintegral-lifecycle.test.ts`
+   runs every injected script against a fake window and simulates the
+   container's calls; a new direction should get the same treatment.
+
+## Verifying a spec
+
+PlayTurbo's doc (and several others) is a JS-rendered SPA: `curl` and plain
+fetchers return only the `<title>`, which is how half the Mintegral lifecycle
+sat recorded as "could not be re-verified" for so long. Render the page in a
+browser before concluding a rule is undocumented.

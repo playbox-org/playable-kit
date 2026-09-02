@@ -334,7 +334,7 @@ The old doc treated the TikTok/Pangle SDK as one interchangeable URL. Verified r
 ## Critical Rules (cross-network)
 
 1. **Use the network's own CTA** — do not hard-redirect via `window.location`; most networks reject auto-redirect and first-tap redirect.
-2. **Never overwrite validator lifecycle functions** — `gameReady` is defined by the validator (Mintegral) and called by us; `gameStart` is defined by us and called by the validator.
+2. **Check the call direction per network before touching any `game*` global** — the name does not carry it, and the same identifier means different things on different networks. `gameReady`/`gameEnd`/`gameRetry` the creative CALLS; `gameStart`/`gameClose` the creative DEFINES and the container calls. Luna's `startGame` is a third thing again (a boot gate), and TikTok has no lifecycle at all. Full table and the traps: `docs/networks/lifecycle-call-direction.md`.
 3. **No external network requests** for most networks — inline assets (base64/data-URI). Exceptions with external assets: Snapchat (CDN), Adikteev (CDN JS/CSS), Yandex (separate files in ZIP).
 4. **Respect size ceilings — several are tight:** Chartboost 3 MB, GDT 3 MB, Yandex 3 MB (index < 500 KB), myTarget/Tapjoy 2 MB, Liftoff < 700 KB (no video).
 5. **Audio:** muted until first user interaction; muted on background/close. Yandex forbids audio/video clips entirely.

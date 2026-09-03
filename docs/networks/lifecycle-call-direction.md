@@ -198,7 +198,7 @@ browser before concluding a rule is undocumented.
 
 ## Pause, resume, resize — container signals on the bridge
 
-Since 0.3.14 every bridge carries `is_paused()`, `on_pause(cb)`,
+Since 0.3.15 every bridge carries `is_paused()`, `on_pause(cb)`,
 `on_resume(cb)`, `on_resize(cb)`. They are fed by `lifecycleSignals()` in
 `base.ts`: page visibility + window resize everywhere; MRAID adds
 `viewableChange` / `stateChange('hidden')` / `sizeChange`; Luna forwards

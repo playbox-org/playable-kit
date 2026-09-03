@@ -646,12 +646,16 @@ export class BaseAdapter implements NetworkAdapter {
     // TikTok's spec: "Place the following code at the bottom of body and
     // before the developer's own JS." Body end it is; the single-file path
     // moves the game bundle after this, the Cocos loader boots later anyway.
-    // Google is the exception — ExitApi must follow its ad.size/ad.orientation
-    // metas in <head>, and GoogleAdapter owns that order.
-    if (this.networkConfig.sdkUrl && this.networkId !== 'google') {
-      builder.injectBodyScriptSrc(this.networkConfig.sdkUrl)
-    } else if (this.networkConfig.sdkUrl) {
-      builder.injectHeadScript(this.networkConfig.sdkUrl)
+    // Google is the exception — its exitapi.js stays in <head> as before
+    // (pre-existing placement, kept unchanged). ExitApi does not read the
+    // ad.size/ad.orientation metas GoogleAdapter appends afterwards, so their
+    // relative order in <head> is not spec-constrained.
+    if (this.networkConfig.sdkUrl) {
+      if (this.networkId === 'google') {
+        builder.injectHeadScript(this.networkConfig.sdkUrl)
+      } else {
+        builder.injectBodyScriptSrc(this.networkConfig.sdkUrl)
+      }
     }
     // Inject SDK inline JS if specified
     if (this.networkConfig.sdkInline) {

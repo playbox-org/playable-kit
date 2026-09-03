@@ -771,18 +771,22 @@ describe('Network Adapters', () => {
     const config = { orientation: 'portrait' as const }
 
     for (const id of ['tiktok', 'pangle', 'bigo', 'gdt']) {
-      it(`${id}: the SDK script sits at the end of body, after the bridge`, () => {
+      it(`${id}: the SDK script sits at the end of body, BEFORE the bridge`, () => {
         const b = new HtmlBuilder(html)
         getAdapter(id).transform(b, config)
         const out = b.toHtml()
         const sdkAt = out.indexOf('<script src="https://')
+        const bridgeAt = out.indexOf('window.plbx_html = window.plbx_html ||')
+        const lifecycleAt = out.indexOf('visibilitychange')
         expect(sdkAt).toBeGreaterThan(out.indexOf('<canvas'))
         expect(sdkAt).toBeLessThan(out.indexOf('</body>'))
         expect(out.indexOf('</head>')).toBeLessThan(sdkAt)
+        expect(sdkAt).toBeLessThan(bridgeAt)
+        expect(sdkAt).toBeLessThan(lifecycleAt)
       })
     }
 
-    it('google keeps exitapi.js in head (its meta tags must precede it)', () => {
+    it('google keeps exitapi.js in head', () => {
       const b = new HtmlBuilder(html)
       getAdapter('google').transform(b, config)
       const out = b.toHtml()

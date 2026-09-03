@@ -107,18 +107,18 @@ export async function packageForNetworks(
     new HtmlBuilder(baseHtml),
     options.config.input,
   )
-  const splashOpts = (cfg: PackageConfig) =>
-    cfg.showSplash === false
-      ? null
-      : splashLogoDataUrl
-        ? { customLogo: { dataUrl: splashLogoDataUrl }, logoScale: cfg.splashLogoScale }
-        : {}
 
   // Optional client splash logo — read once, shared across networks. Unreadable
   // path / unsupported type falls back to the default PLBX splash (no hard fail).
   const splashLogoDataUrl = resolveSplashLogoDataUrl(
     options.config.customSplashLogo,
   )
+  const splashOpts = (cfg: PackageConfig) =>
+    cfg.showSplash === false
+      ? null
+      : splashLogoDataUrl
+        ? { customLogo: { dataUrl: splashLogoDataUrl }, logoScale: cfg.splashLogoScale }
+        : {}
 
   // Startup version banner injected into every build (console.log on run).
   const versionBanner = buildVersionBanner(
@@ -258,9 +258,19 @@ export async function packageForNetworks(
       // rewrite happen on the builder itself so every branch below (inline
       // HTML, single-file ZIP, plain ZIP, launcher payload) ships the same
       // document. The loader path leaves the builder alone and lets
-      // generateFullHtml rewrite it.
+      // generateFullHtml rewrite it. No splash for launcher-payload: Moloco's
+      // launcher already renders its own viewability-gated splash
+      // (launcher-builder.ts) — a second one here would double the overlay
+      // and its game_ready wrapper would hide unconditionally, bypassing the
+      // launcher's ready+viewable gate. Same format guard the two marker
+      // injections above already use.
       if (inputKind === 'single-file') {
-        applySingleFileRewrite(builder, splashOpts(packageConfig))
+        applySingleFileRewrite(
+          builder,
+          network.format === 'launcher-payload'
+            ? null
+            : splashOpts(packageConfig),
+        )
       }
 
       // Non-fatal warning: a network whose validator requires a Google Play Store

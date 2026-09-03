@@ -128,5 +128,15 @@ describe('single-file packaging — every network', () => {
     expect(payload).toContain('window.__fixture=')
     expect(payload).not.toContain('__plbx_zip')
     expect(getNetwork('molocoV2')!.launcherPayload!.launcherMaxSize).toBe(3 * 1024)
+    // No second splash: the launcher already renders its own
+    // viewability-gated splash (launcher-builder.ts) — the single-file
+    // splash must not be injected into the payload as well. Note: the
+    // molocoV2 bridge itself defensively CALLS window.__plbx_splash_hide()
+    // (to dismiss the launcher's own splash once game_ready + viewable) —
+    // that reference is legitimate and present regardless of this fix, so
+    // the marker checked here is the splash DEFINITION (buildSplash's
+    // hideJs), which only the single-file path would inject.
+    expect(payload).not.toContain('id="s"')
+    expect(payload).not.toContain('window.__plbx_splash_hide=function(')
   })
 })

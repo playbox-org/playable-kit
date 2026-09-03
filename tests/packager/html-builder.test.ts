@@ -170,5 +170,29 @@ describe('HtmlBuilder', () => {
       // moved, not copied
       expect(html.split('window.__bundle=1').length).toBe(2)
     })
+
+    it('toClassicBundle prefers the type="module" script over a longer plain inline script', () => {
+      // A tiny module bundle (the real bundle) alongside a much larger plain
+      // inline script injected afterwards (simulating an adapter-injected
+      // bridge, e.g. the ~4KB MRAID bridge outsizing a small synthetic build).
+      // The length heuristic alone would wrongly pick the bridge; the module
+      // marker must win.
+      const b = new HtmlBuilder(vite)
+      const bigBridge = `window.plbx_html = {}; /* ${'x'.repeat(2000)} */`
+      b.injectBodyScript(bigBridge)
+      expect(bigBridge.length).toBeGreaterThan('(function(){window.__bundle=1})();'.length)
+      b.toClassicBundle()
+      const html = b.toHtml()
+      expect(html).not.toContain('type="module"')
+      const bridgeAt = html.indexOf('window.plbx_html = {}')
+      const bundleAt = html.indexOf('window.__bundle=1')
+      expect(bridgeAt).toBeGreaterThan(-1)
+      // The module script (the bundle) was moved after the larger bridge script.
+      expect(bundleAt).toBeGreaterThan(bridgeAt)
+      expect(bundleAt).toBeLessThan(html.indexOf('</body>'))
+      // The larger plain script stayed exactly where it was injected — NOT moved.
+      expect(html.split('window.plbx_html = {}').length).toBe(2)
+      expect(html.split('window.__bundle=1').length).toBe(2)
+    })
   })
 })

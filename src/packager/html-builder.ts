@@ -99,13 +99,17 @@ export class HtmlBuilder {
    * script the adapters appended. cheerio's append() MOVES an existing node,
    * so the bundle is not duplicated.
    *
-   * Which script IS the bundle: prefer the original `type="module"` script —
-   * that is vite-plugin-singlefile's unambiguous marker for the entry bundle,
-   * present before any adapter/bridge code is injected. Only when no script
-   * carries it (an already-classic single-file build) fall back to the
-   * longest inline script — a real bundle dwarfs any bridge/lifecycle script
-   * we inject, but a bridge script (e.g. the ~4KB MRAID bridge) CAN outsize a
-   * tiny synthetic bundle, so the length heuristic alone is not reliable.
+   * Which script IS the bundle — rule, in order:
+   *  1. Module marker first: the original `type="module"` script, if any —
+   *     vite-plugin-singlefile's unambiguous marker for the entry bundle,
+   *     read BEFORE the attribute is stripped below (so the marker survives
+   *     the stripping that happens in this same pass).
+   *  2. Longest-inline fallback: only when no script carries that marker (an
+   *     already-classic single-file build) fall back to the longest inline
+   *     script. A real bundle dwarfs any bridge/lifecycle script we inject,
+   *     but an adapter-injected script (e.g. the ~4KB MRAID bridge) CAN
+   *     outsize a tiny synthetic bundle, so length alone is not reliable
+   *     whenever a module marker is available to check first.
    */
   toClassicBundle(): void {
     let moduleScript: ReturnType<CheerioAPI> | null = null

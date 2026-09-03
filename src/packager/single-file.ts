@@ -1,3 +1,5 @@
+import { readdirSync, statSync } from 'node:fs'
+import { join, relative } from 'node:path'
 import { HtmlBuilder } from './html-builder'
 import { buildSplash, SINGLE_FILE_SPLASH_HOOK_JS } from './splash'
 import type { SplashOptions } from './splash'
@@ -25,6 +27,52 @@ export function detectInputKind(
   }
   if (explicit && explicit !== 'auto') return explicit
   return refs.length ? 'loader' : 'single-file'
+}
+
+/**
+ * Files inside `buildDir`, besides `index.html`, that `getLocalRefs` never
+ * found — a sanity check on top of the reference scan for `detectInputKind`.
+ * `getLocalRefs` reads what the HTML claims to need; this reads what the
+ * build directory actually contains. When the two disagree with files left
+ * over, either the build is truly single-file and those files are junk, OR
+ * the game fetches them at runtime by a path the HTML markup never mentions
+ * (a common free-stack pattern: assets loaded via `fetch()`/`new Audio()`
+ * with a computed URL) — in which case auto-detecting single-file would ship
+ * an artifact missing those files. The packager can't tell which case it is,
+ * so it only warns (see `packageForNetworks`), never blocks.
+ *
+ * Recursive, relative paths, dotfiles (`.plbx.json` and friends) excluded —
+ * those are tooling metadata, never build output a game would fetch.
+ */
+export function unreferencedBuildFiles(buildDir: string): string[] {
+  const out: string[] = []
+  const walk = (dir: string): void => {
+    let entries: string[]
+    try {
+      entries = readdirSync(dir)
+    } catch {
+      return
+    }
+    for (const name of entries) {
+      if (name.startsWith('.')) continue
+      const full = join(dir, name)
+      let isDir: boolean
+      try {
+        isDir = statSync(full).isDirectory()
+      } catch {
+        continue
+      }
+      if (isDir) {
+        walk(full)
+        continue
+      }
+      const rel = relative(buildDir, full)
+      if (rel === 'index.html') continue
+      out.push(rel)
+    }
+  }
+  walk(buildDir)
+  return out
 }
 
 /**

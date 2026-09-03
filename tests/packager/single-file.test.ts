@@ -1,9 +1,9 @@
-import { existsSync, readFileSync, rmSync } from 'fs'
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import JSZip from 'jszip'
 import { afterAll, describe, expect, it } from 'vitest'
 import { packageForNetworks } from '../../src/packager/packager'
-import { detectInputKind } from '../../src/packager/single-file'
+import { detectInputKind, unreferencedBuildFiles } from '../../src/packager/single-file'
 import { HtmlBuilder } from '../../src/packager/html-builder'
 import { NETWORKS, getNetwork, maxSizeForFormat } from '../../src/networks'
 import { getAdapter } from '../../src/packager/network-adapters'
@@ -13,9 +13,11 @@ const FIXTURES = join(__dirname, '../fixtures')
 const BUILD = join(FIXTURES, 'single-file-build')
 const COCOS = join(FIXTURES, 'sample-build')
 const OUT = join(FIXTURES, 'single-file-out')
+const BUILD_WITH_EXTRA = join(FIXTURES, 'single-file-build-with-extra')
 
 afterAll(() => {
   if (existsSync(OUT)) rmSync(OUT, { recursive: true, force: true })
+  if (existsSync(BUILD_WITH_EXTRA)) rmSync(BUILD_WITH_EXTRA, { recursive: true, force: true })
 })
 
 /** The primary HTML of a result — the file itself, or the entry inside its ZIP. */
@@ -43,6 +45,48 @@ describe('input detection', () => {
   it('explicit loader on a single-file build is honoured', () => {
     const b = new HtmlBuilder(readFileSync(join(BUILD, 'index.html'), 'utf-8'))
     expect(detectInputKind(b, 'loader')).toBe('loader')
+  })
+})
+
+describe('unreferencedBuildFiles', () => {
+  it('is empty for a build dir that only has index.html', () => {
+    expect(unreferencedBuildFiles(BUILD)).toEqual([])
+  })
+
+  it('lists non-dot files besides index.html, top-level and nested', () => {
+    if (existsSync(BUILD_WITH_EXTRA)) rmSync(BUILD_WITH_EXTRA, { recursive: true, force: true })
+    cpSync(BUILD, BUILD_WITH_EXTRA, { recursive: true })
+    writeFileSync(join(BUILD_WITH_EXTRA, 'bg.png'), 'x')
+    writeFileSync(join(BUILD_WITH_EXTRA, '.plbx.json'), '{}')
+    const nestedDir = join(BUILD_WITH_EXTRA, 'assets')
+    mkdirSync(nestedDir)
+    writeFileSync(join(nestedDir, 'sound.mp3'), 'x')
+    const files = unreferencedBuildFiles(BUILD_WITH_EXTRA).sort()
+    expect(files).toEqual(['assets/sound.mp3', 'bg.png'])
+  })
+})
+
+describe('single-file auto-detect warns on unreferenced build files', () => {
+  it('warns when the build dir has files besides index.html that nothing references', async () => {
+    if (existsSync(BUILD_WITH_EXTRA)) rmSync(BUILD_WITH_EXTRA, { recursive: true, force: true })
+    cpSync(BUILD, BUILD_WITH_EXTRA, { recursive: true })
+    writeFileSync(join(BUILD_WITH_EXTRA, 'bg.png'), 'x')
+    const result = await packageForNetworks({
+      buildDir: BUILD_WITH_EXTRA, outputDir: OUT, networks: ['applovin'],
+      config: { orientation: 'portrait' }, templateVariables: { assetTitle: 'Fixture Game' }, packagerVersion: '0.3.15',
+    })
+    const r = result.results[0]
+    expect(r.warnings, JSON.stringify(r.warnings)).toBeDefined()
+    expect(r.warnings!.some((w) => /besides index\.html/.test(w))).toBe(true)
+  })
+
+  it('the plain fixture (no extra files) produces no such warning', async () => {
+    const result = await packageForNetworks({
+      buildDir: BUILD, outputDir: OUT, networks: ['applovin'],
+      config: { orientation: 'portrait' }, templateVariables: { assetTitle: 'Fixture Game' }, packagerVersion: '0.3.15',
+    })
+    const r = result.results[0]
+    expect((r.warnings || []).some((w) => /besides index\.html/.test(w))).toBe(false)
   })
 })
 

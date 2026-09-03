@@ -69,13 +69,31 @@ export class HtmlBuilder {
   }
 
   /**
-   * Local script/stylesheet references. A single-file build has none: every
-   * asset is already inlined. `mraid.js` and http(s) URLs are container-served
-   * by design and do not count.
+   * Local references the build ships as separate files — the input-detection
+   * signal for `detectInputKind` (single-file vs. loader). A single-file
+   * build has none: every asset is already inlined. `mraid.js`, http(s), and
+   * `data:`/`blob:` URLs are container-served or already-inlined by design
+   * and do not count.
+   *
+   * Grouped, not merely deduped, in this fixed order:
+   *  1. `script[src]`
+   *  2. `link[rel="stylesheet"][href]`
+   *  3. everything else that can point at a local file — `img[src]`,
+   *     `audio[src]`, `video[src]`, `source[src]`, and any other `link[href]`
+   *     (manifest, icon, apple-touch-icon, …) — walked once, in document
+   *     order, so this group interleaves however the markup does.
+   * Groups 1-2 came first historically (script/stylesheet refs are what a
+   * loader-path build needs rewritten); group 3 exists so a Vite build that
+   * inlines its JS/CSS but still points at a real logo.png or favicon.ico
+   * isn't misdetected as single-file.
    */
   getLocalRefs(): string[] {
     const isLocal = (ref: string) =>
-      !!ref && !/^https?:\/\//i.test(ref) && ref !== 'mraid.js'
+      !!ref &&
+      !/^https?:\/\//i.test(ref) &&
+      !/^data:/i.test(ref) &&
+      !/^blob:/i.test(ref) &&
+      ref !== 'mraid.js'
     const refs: string[] = []
     this.$('script[src]').each((_, el) => {
       const s = this.$(el).attr('src') || ''
@@ -84,6 +102,13 @@ export class HtmlBuilder {
     this.$('link[rel="stylesheet"][href]').each((_, el) => {
       const h = this.$(el).attr('href') || ''
       if (isLocal(h)) refs.push(h)
+    })
+    this.$(
+      'img[src], audio[src], video[src], source[src], link[href]:not([rel="stylesheet"])',
+    ).each((_, el) => {
+      const $el = this.$(el)
+      const v = ($el.is('link') ? $el.attr('href') : $el.attr('src')) || ''
+      if (isLocal(v)) refs.push(v)
     })
     return refs
   }

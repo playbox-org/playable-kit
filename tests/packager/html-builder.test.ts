@@ -155,6 +155,34 @@ describe('HtmlBuilder', () => {
       expect(new HtmlBuilder(vite).getLocalRefs()).toEqual([])
     })
 
+    it('getLocalRefs also collects local media/link refs, grouped scripts-then-stylesheets-then-rest', () => {
+      const b = new HtmlBuilder(
+        '<html><head>' +
+          '<script type="module">console.log(1)</script>' +
+          '</head><body>' +
+          '<img src="logo.png">' +
+          '<link rel="icon" href="fav.ico">' +
+          '</body></html>',
+      )
+      // "the rest" is walked in document order — img before the link here —
+      // and comes after the (empty) scripts/stylesheets groups above it.
+      expect(b.getLocalRefs()).toEqual(['logo.png', 'fav.ico'])
+    })
+
+    it('getLocalRefs ignores data:/blob: URLs on media and non-stylesheet links', () => {
+      const b = new HtmlBuilder(
+        '<html><head>' +
+          '<link rel="manifest" href="data:application/json;base64,e30=">' +
+          '</head><body>' +
+          '<img src="blob:http://x/1">' +
+          '<audio src="https://cdn.example.com/a.mp3"></audio>' +
+          '<video src="movie.mp4"></video>' +
+          '<source src="clip.webm">' +
+          '</body></html>',
+      )
+      expect(b.getLocalRefs()).toEqual(['movie.mp4', 'clip.webm'])
+    })
+
     it('toClassicBundle strips module attrs and moves the bundle after body scripts', () => {
       const b = new HtmlBuilder(vite)
       b.injectBodyScript('window.plbx_html = {};')

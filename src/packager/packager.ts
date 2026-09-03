@@ -32,7 +32,11 @@ import {
   generatePayloadJs,
   htmlToPayloadJs,
 } from './runtime-loader'
-import { detectInputKind, applySingleFileRewrite } from './single-file'
+import {
+  detectInputKind,
+  applySingleFileRewrite,
+  unreferencedBuildFiles,
+} from './single-file'
 import {
   buildLauncher,
   fillLauncherPayloadUrl,
@@ -107,6 +111,25 @@ export async function packageForNetworks(
     new HtmlBuilder(baseHtml),
     options.config.input,
   )
+
+  // Auto-detection sanity check: a build the detector called single-file
+  // (index.html references no local file) but whose directory still holds
+  // other, unreferenced files. Advisory only — see unreferencedBuildFiles's
+  // doc for why this can't be a hard error. Skipped when the caller forced
+  // config.input: an explicit 'single-file' already told us the extra files
+  // are junk, nothing to warn about.
+  const unreferencedWarnings: string[] = []
+  if (inputKind === 'single-file' && options.config.input !== 'single-file') {
+    const extra = unreferencedBuildFiles(options.buildDir)
+    if (extra.length) {
+      const first3 = extra.slice(0, 3)
+      const w =
+        `Build dir has ${extra.length} file(s) besides index.html (${first3.join(', ')}…) but index.html references none — packaged as single-file. ` +
+        `If the game loads them at runtime, pass config.input = 'loader'.`
+      unreferencedWarnings.push(w)
+      console.warn(`[plbx] ${w}`)
+    }
+  }
 
   // Optional client splash logo — read once, shared across networks. Unreadable
   // path / unsupported type falls back to the default PLBX splash (no hard fail).
@@ -282,6 +305,12 @@ export async function packageForNetworks(
       for (const w of regionalWarnings) {
         warnings.push(w)
         console.warn(`[plbx] ${network.name}: ${w}`)
+        options.onProgress?.(networkId, 'processing', w)
+      }
+
+      // Unreferenced build files under single-file auto-detection — see above.
+      for (const w of unreferencedWarnings) {
+        warnings.push(w)
         options.onProgress?.(networkId, 'processing', w)
       }
 

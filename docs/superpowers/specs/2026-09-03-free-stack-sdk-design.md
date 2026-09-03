@@ -47,10 +47,14 @@ Three.js build and in a Cocos build.
 
 `packageForNetworks` gains a second input path selected per build directory.
 
-**Detection.** `PackageConfig.input?: 'auto' | 'cocos' | 'single-file'`,
-default `'auto'`. Auto picks `cocos` when `index.html` contains a
-`systemjs-importmap` script or the build dir has `cocos-js/`; otherwise
-`single-file`. An explicit value always wins.
+**Detection.** `PackageConfig.input?: 'auto' | 'loader' | 'single-file'`,
+default `'auto'`. A single-file build references no local file — every
+asset is inlined — so auto picks `single-file` when `index.html` has no
+local `<script src>` / stylesheet `href` (`mraid.js` and `http(s)://` URLs
+do not count), else `loader` (Cocos web-mobile and any other multi-file
+build keep the runtime-loader path exactly as today). An explicit value
+wins, except `single-file` forced on a build with local refs, which is an
+error naming the offending file.
 
 **Single-file path.** Same loop, same adapters, same output branches. Only
 the asset-container step differs:

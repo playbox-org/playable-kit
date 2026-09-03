@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, rmSync } from 'fs'
+import { existsSync, readdirSync, readFileSync, rmSync } from 'fs'
 import { join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
 import { main } from '../src/cli'
@@ -35,6 +35,26 @@ describe('playable-kit package', () => {
     const code = await main(['package', '--build', BUILD, '--out', OUT, '--networks', 'nope'], (l) => lines.push(l))
     expect(code).toBe(1)
     expect(lines.join('\n')).toMatch(/Unknown network "nope"\. One of: .*applovin/)
+  })
+
+  it('--splash produces an artifact with the splash markup, default does not', async () => {
+    const withSplash = join(OUT, 'with-splash')
+    const withoutSplash = join(OUT, 'without-splash')
+    const codeOn = await main(
+      ['package', '--build', BUILD, '--out', withSplash, '--networks', 'applovin', '--name', 'My Game', '--splash'],
+      () => {},
+    )
+    expect(codeOn).toBe(0)
+    const htmlOn = readFileSync(join(withSplash, 'applovin', 'My_Game_applovin.html'), 'utf-8')
+    expect(htmlOn).toContain('id="s"')
+
+    const codeOff = await main(
+      ['package', '--build', BUILD, '--out', withoutSplash, '--networks', 'applovin', '--name', 'My Game'],
+      () => {},
+    )
+    expect(codeOff).toBe(0)
+    const htmlOff = readFileSync(join(withoutSplash, 'applovin', 'My_Game_applovin.html'), 'utf-8')
+    expect(htmlOff).not.toContain('id="s"')
   })
 
   it('no subcommand → usage, exit 1', async () => {

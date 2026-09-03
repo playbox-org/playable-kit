@@ -55,10 +55,12 @@ export interface PackageConfig {
   loaderMode?: 'self-contained' | 'systemjs'
   /** Networks pinned to the legacy SystemJS loader regardless of loaderMode. */
   legacyLoaderNetworks?: string[]
-  /** Show PLBX loading splash until the first rendered Cocos frame. Default true. */
+  /** Show the PLBX loading splash (or `customSplashLogo`) until the first
+   *  rendered frame. Default **false** since 0.3.15 — opt in explicitly. */
   showSplash?: boolean
   /** Absolute path to a client logo (PNG/JPG/WebP) shown on the splash instead
-   *  of the PLBX pinwheel + wordmark. Empty/unreadable → default PLBX splash. */
+   *  of the PLBX pinwheel + wordmark. Empty/unreadable → default PLBX splash.
+   *  Requires `showSplash: true` — a logo alone does NOT turn the splash on. */
   customSplashLogo?: string
   /** Size of `customSplashLogo` as a percentage of the viewport's SHORTER side
    *  (emitted as `vmin`). Default 26 — the responsive equivalent of the fixed

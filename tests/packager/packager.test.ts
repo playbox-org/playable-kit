@@ -40,6 +40,32 @@ const defaultConfig = {
   orientation: 'portrait' as const,
 }
 
+describe('splash default (loader path)', () => {
+  it('default config emits no splash markup', async () => {
+    const result = await packageForNetworks({
+      buildDir: MOCK_BUILD,
+      outputDir: join(PACK_OUTPUT, 'splash-default'),
+      networks: ['applovin'],
+      config: defaultConfig,
+    })
+    const html = readFileSync(result.results[0].outputPath, 'utf-8')
+    expect(html).not.toContain('id="s"')
+    expect(html).not.toContain('window.__plbx_splash_hide=function(')
+  })
+
+  it('showSplash: true emits the splash markup', async () => {
+    const result = await packageForNetworks({
+      buildDir: MOCK_BUILD,
+      outputDir: join(PACK_OUTPUT, 'splash-on'),
+      networks: ['applovin'],
+      config: { ...defaultConfig, showSplash: true },
+    })
+    const html = readFileSync(result.results[0].outputPath, 'utf-8')
+    expect(html).toContain('id="s"')
+    expect(html).toContain('window.__plbx_splash_hide=function(')
+  })
+})
+
 describe('custom splash logo size', () => {
   const logoConfig = {
     ...defaultConfig,

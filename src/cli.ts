@@ -9,10 +9,13 @@ const USAGE = `playable-kit ${KIT_VERSION}
 
   playable-kit package [--build dist] [--out dist-networks] [--networks all|a,b,c]
                        [--name "Asset Title"] [--orientation auto|portrait|landscape]
-                       [--android URL] [--ios URL] [--input auto|loader|single-file] [--no-splash]
+                       [--android URL] [--ios URL] [--input auto|loader|single-file] [--splash]
+                       [--splash-logo <path>]
 
 Packages a web build (a Vite single-file index.html, a Cocos web-mobile dir, or
-any index.html + assets) for every ad network. Output: <out>/<network>/<name>_<network>.<html|zip>.`
+any index.html + assets) for every ad network. Output: <out>/<network>/<name>_<network>.<html|zip>.
+The loading splash is off by default; pass --splash to show it (--splash-logo
+swaps the PLBX mark for a custom logo, with --splash).`
 
 const mb = (b: number) => `${(b / 1e6).toFixed(2)} MB`
 
@@ -36,7 +39,8 @@ export async function main(
       android: { type: 'string' },
       ios: { type: 'string' },
       input: { type: 'string', default: 'auto' },
-      'no-splash': { type: 'boolean', default: false },
+      splash: { type: 'boolean', default: false },
+      'splash-logo': { type: 'string' },
     },
   })
 
@@ -62,7 +66,10 @@ export async function main(
     storeUrlAndroid: values.android,
     storeUrlIos: values.ios,
     input: values.input as PackageConfig['input'],
-    showSplash: !values['no-splash'],
+    showSplash: !!values.splash,
+    customSplashLogo: values['splash-logo']
+      ? resolve(values['splash-logo'])
+      : undefined,
   }
 
   const errors: string[] = []

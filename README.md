@@ -42,6 +42,11 @@ vite build && npx playable-kit package --build dist --out dist-networks --networ
 Without a packaged bridge (`vite dev`, a browser tab) the SDK installs a
 preview stub: CTA opens the store URL, pause/resume follow page visibility.
 
+The PLBX loading splash is off by default on both packaging paths. Opt in with
+`--splash` (CLI) or `showSplash: true` (`PackageConfig`); `--splash-logo
+<path>` / `customSplashLogo` swaps in a client logo but only takes effect
+alongside `--splash` / `showSplash: true`.
+
 ## Lifecycle globals — check the direction first
 
 ⚠️ A `game*` global's **name does not tell you who calls it**, and the same

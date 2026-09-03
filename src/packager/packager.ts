@@ -137,7 +137,7 @@ export async function packageForNetworks(
     options.config.customSplashLogo,
   )
   const splashOpts = (cfg: PackageConfig) =>
-    cfg.showSplash === false
+    cfg.showSplash !== true
       ? null
       : splashLogoDataUrl
         ? { customLogo: { dataUrl: splashLogoDataUrl }, logoScale: cfg.splashLogoScale }
@@ -605,7 +605,7 @@ export async function packageForNetworks(
               cssContent,
               buildDir: options.buildDir,
               loaderMode: effectiveLoaderMode,
-              showSplash: packageConfig.showSplash !== false,
+              showSplash: packageConfig.showSplash === true,
               splashLogoDataUrl,
               splashLogoScale: packageConfig.splashLogoScale,
             })
@@ -708,7 +708,7 @@ export async function packageForNetworks(
                       cssContent,
                       buildDir: options.buildDir,
                       loaderMode: effectiveLoaderMode,
-                      showSplash: packageConfig.showSplash !== false,
+                      showSplash: packageConfig.showSplash === true,
                       splashLogoDataUrl,
                       splashLogoScale: packageConfig.splashLogoScale,
                       encoding: 'base122',

@@ -113,7 +113,7 @@ describe('single-file packaging — every network', () => {
   it('the HTML is a classic script with the bundle after the bridge, no loader', async () => {
     const result = await packageForNetworks({
       buildDir: BUILD, outputDir: OUT, networks: ['applovin', 'mintegral', 'tiktok', 'google', 'luna', 'vungle'],
-      config: { orientation: 'portrait' }, templateVariables: { assetTitle: 'Fixture Game' }, packagerVersion: '0.3.13',
+      config: { orientation: 'portrait', showSplash: true }, templateVariables: { assetTitle: 'Fixture Game' }, packagerVersion: '0.3.13',
     })
     for (const r of result.results) {
       const html = await primaryHtml(r.outputPath)
@@ -131,6 +131,27 @@ describe('single-file packaging — every network', () => {
       expect(html, r.networkId).toContain('id="s"')
       expect(html, r.networkId).toContain('__plbx_splash_hide')
     }
+  })
+
+  it('splash is opt-in: default config emits no splash markup on the single-file path', async () => {
+    const result = await packageForNetworks({
+      buildDir: BUILD, outputDir: OUT, networks: ['applovin'],
+      config: { orientation: 'portrait' }, templateVariables: { assetTitle: 'Fixture Game' }, packagerVersion: '0.3.15',
+    })
+    const html = await primaryHtml(result.results[0].outputPath)
+    expect(html).not.toContain('id="s"')
+    expect(html).not.toContain('window.__plbx_splash_hide=function(')
+  })
+
+  it('a custom splash logo without showSplash:true does not turn the splash on', async () => {
+    const result = await packageForNetworks({
+      buildDir: BUILD, outputDir: OUT, networks: ['applovin'],
+      config: { orientation: 'portrait', customSplashLogo: join(FIXTURES, 'fake-texture.png') },
+      templateVariables: { assetTitle: 'Fixture Game' }, packagerVersion: '0.3.15',
+    })
+    const html = await primaryHtml(result.results[0].outputPath)
+    expect(html).not.toContain('id="s"')
+    expect(html).not.toContain('window.__plbx_splash_hide=function(')
   })
 
   it('inner names and config.json follow the network rules', async () => {

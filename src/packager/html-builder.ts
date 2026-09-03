@@ -1,4 +1,5 @@
 import * as cheerio from 'cheerio'
+import type { CheerioAPI } from 'cheerio'
 import CleanCSS from 'clean-css'
 
 export class HtmlBuilder {
@@ -48,6 +49,71 @@ export class HtmlBuilder {
   /** Inject a raw HTML comment into <head> (validator-friendly plaintext, super-html parity). */
   injectHeadComment(text: string): void {
     this.$('head').prepend(`<!-- ${text} -->\n`)
+  }
+
+  /** Inject a <script src="..."> at the END of <body>. Network SDKs that the
+   *  spec wants "at the bottom of body, before the developer's own JS" (TikTok)
+   *  go here; the single-file path moves the game bundle after it. */
+  injectBodyScriptSrc(src: string): void {
+    this.$('body').append(`<script src="${src}"></script>\n`)
+  }
+
+  /** Append a <style> block to <head>. */
+  injectHeadStyle(css: string): void {
+    this.$('head').append(`<style>${css}</style>\n`)
+  }
+
+  /** Insert raw HTML as the first child of <body> (splash overlay). */
+  prependBody(html: string): void {
+    this.$('body').prepend(html)
+  }
+
+  /**
+   * Local script/stylesheet references. A single-file build has none: every
+   * asset is already inlined. `mraid.js` and http(s) URLs are container-served
+   * by design and do not count.
+   */
+  getLocalRefs(): string[] {
+    const isLocal = (ref: string) =>
+      !!ref && !/^https?:\/\//i.test(ref) && ref !== 'mraid.js'
+    const refs: string[] = []
+    this.$('script[src]').each((_, el) => {
+      const s = this.$(el).attr('src') || ''
+      if (isLocal(s)) refs.push(s)
+    })
+    this.$('link[rel="stylesheet"][href]').each((_, el) => {
+      const h = this.$(el).attr('href') || ''
+      if (isLocal(h)) refs.push(h)
+    })
+    return refs
+  }
+
+  /**
+   * Classic-script rewrite for single-file builds.
+   *
+   * A `file://` container refuses module scripts ("Do not use crossorigin,
+   * type=module…"), so the attributes go. Without `type="module"` an inline
+   * script is no longer deferred — it runs where it stands, and a Vite build
+   * puts it in <head>, before <body> exists. So the bundle (the largest inline
+   * script) is moved to the very end of <body>: after the DOM it queries and
+   * after every bridge script the adapters appended. cheerio's append() MOVES
+   * an existing node, so the bundle is not duplicated.
+   */
+  toClassicBundle(): void {
+    let bundle: ReturnType<CheerioAPI> | null = null
+    let bundleLen = -1
+    this.$('script').each((_, el) => {
+      const $el = this.$(el)
+      if ($el.attr('type') === 'module') $el.removeAttr('type')
+      $el.removeAttr('crossorigin')
+      if ($el.attr('src')) return
+      const len = ($el.html() || '').length
+      if (len > bundleLen) {
+        bundleLen = len
+        bundle = $el
+      }
+    })
+    if (bundle) this.$('body').append(bundle)
   }
 
   /** Replace a script src with a new src */

@@ -150,6 +150,9 @@ window.plbx_html.set_size = function(w, h) {
   for (var i = 0; i < _resizeSubs.length; i++) { try { _resizeSubs[i](w, h); } catch(e) {} }
 };
 window.plbx_html.report = function(k) { fire(k); };
+// Custom analytics channel — no Moloco-side sink, so a no-op like every
+// non-Luna network (see buildPlbxBridge in base.ts).
+window.plbx_html.log_event = function() {};
 window.plbx_html.tap = function() {
   taps++;
   var te = macroInt('taps_for_engagement', ${MOLOCO_V2_DEFAULT_TAP_ENGAGEMENT});

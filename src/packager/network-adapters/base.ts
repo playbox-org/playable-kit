@@ -131,6 +131,9 @@ function buildPlbxBridge(downloadBody: string, extras?: string): string {
   },
   report: function() {},
   tap: function() {},
+  // Custom analytics channel. Luna's adapter replaces it with a real sender;
+  // everywhere else a no-op so plbx.log_event() is never a TypeError.
+  log_event: function() {},
   external_commands: [],
   expose: function(name, fn, label) {
     if (typeof name !== 'string' || typeof fn !== 'function') return;

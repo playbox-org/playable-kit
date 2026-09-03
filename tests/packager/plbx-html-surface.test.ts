@@ -36,6 +36,7 @@ const REQUIRED_MEMBERS = [
   'on_mute_change',
   'report',
   'tap',
+  'log_event',
   'expose',
   'is_paused',
   'on_pause',
@@ -109,6 +110,20 @@ describe('plbx_html surface is identical on every network', () => {
       ;(bridge.on_game_start as (cb: () => void) => void)(() => { ran++ })
       expect(ran, id).toBe(1)
       expect((bridge.is_game_started as () => boolean)(), id).toBe(true)
+    }
+  })
+
+  // log_event is a no-op stub on every network except Luna, whose adapter
+  // overrides it with a real sender to window.pi (see lunaBridge in base.ts).
+  // A regression that let the base no-op leak through would go unnoticed by
+  // the "is it a function" check above — this asserts it is Luna's own.
+  it('luna log_event is the real sender, not the base no-op', () => {
+    const bridge = bridgeFor('luna')
+    expect(String(bridge.log_event)).toContain('_plbx_luna')
+    for (const id of ['applovin', 'facebook', 'mintegral', 'tiktok', 'molocoV2']) {
+      if (!(id in NETWORKS)) continue
+      const other = bridgeFor(id)
+      expect(String(other.log_event), id).not.toContain('_plbx_luna')
     }
   })
 

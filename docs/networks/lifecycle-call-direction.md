@@ -195,3 +195,14 @@ PlayTurbo's doc (and several others) is a JS-rendered SPA: `curl` and plain
 fetchers return only the `<title>`, which is how half the Mintegral lifecycle
 sat recorded as "could not be re-verified" for so long. Render the page in a
 browser before concluding a rule is undocumented.
+
+## Pause, resume, resize — container signals on the bridge
+
+Since 0.3.14 every bridge carries `is_paused()`, `on_pause(cb)`,
+`on_resume(cb)`, `on_resize(cb)`. They are fed by `lifecycleSignals()` in
+`base.ts`: page visibility + window resize everywhere; MRAID adds
+`viewableChange` / `stateChange('hidden')` / `sizeChange`; Luna forwards
+`luna:pause` / `luna:resume`. Mintegral's `gameClose` does NOT pause — a paused
+ad froze its own end card in production. Late subscribers get the current
+state at once (`on_pause` when already paused, `on_resize` with the current
+size). `set_paused` / `set_size` are container-side; game code only subscribes.

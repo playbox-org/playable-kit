@@ -12,6 +12,7 @@ export default defineConfig({
     index: 'src/index.ts',
     networks: 'src/networks.ts',
     types: 'src/types.ts',
+    sdk: 'src/sdk/index.ts',
   },
   format: ['esm', 'cjs'],
   dts: true,

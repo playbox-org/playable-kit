@@ -36,6 +36,10 @@
         "types": "./dist/types.d.cts",
         "default": "./dist/types.cjs"
       }
+    },
+    "./sdk": {
+      "import": { "types": "./dist/sdk.d.ts", "default": "./dist/sdk.js" },
+      "require": { "types": "./dist/sdk.d.cts", "default": "./dist/sdk.cjs" }
     }
   },
   "typesVersions": {
@@ -45,6 +49,9 @@
       ],
       "types": [
         "./dist/types.d.cts"
+      ],
+      "sdk": [
+        "./dist/sdk.d.cts"
       ]
     }
   },
@@ -82,6 +89,7 @@
     "@types/clean-css": "^4.2.11",
     "@types/node": "^20.14.0",
     "eslint": "^9.39.1",
+    "jsdom": "^25",
     "tsup": "^8.3.0",
     "typescript": "^5.5.0",
     "typescript-eslint": "^8.15.0",

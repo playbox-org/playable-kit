@@ -65,3 +65,11 @@ describe('public API barrel', () => {
     })
   }
 })
+
+describe('sdk subpath', () => {
+  it('exports plbx as default and named', async () => {
+    const mod = await import('../src/sdk/index')
+    expect(mod.default).toBe(mod.plbx)
+    expect(typeof mod.plbx.init).toBe('function')
+  })
+})

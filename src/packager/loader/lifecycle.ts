@@ -30,11 +30,15 @@ function plbx_boot() {
   // the validator script may inject after us).
   if (typeof window.gameStart !== 'function') window.gameStart = function () { if (DEBUG) console.log('[plbx] gameStart'); };
   if (typeof window.gameClose !== 'function') window.gameClose = function () { if (DEBUG) console.log('[plbx] gameClose'); };
-  var done = false;
+  // window.__plbx_gr is a SHARED flag with plbx_html.game_ready (base.ts) —
+  // a free-stack single-file build has no loader, so the bridge's own poll is
+  // what fires gameReady there; on the Cocos path it's normally this loader
+  // that gets there first. Either caller sets the flag so the other becomes
+  // a no-op, and gameReady fires exactly once either way.
   (function signal() {
-    if (done) return;
+    if (window.__plbx_gr) return;
     if (typeof window.gameReady === 'function') {
-      done = true;
+      window.__plbx_gr = true;
       try { window.gameReady(); } catch (e) { console.error('[plbx] gameReady:', e); }
       return;
     }

@@ -142,11 +142,14 @@ function generateUnpackCode(options: RuntimeLoaderOptions): string {
     // The validator defines window.gameReady — we poll because it may load
     // AFTER our scripts. Once gameReady is called, the validator calls our
     // gameStart() in response.
-    var _lifecycleDone = false;
+    // window.__plbx_gr is a SHARED flag with plbx_html.game_ready (base.ts) —
+    // see the self-contained loader's lifecycle.ts for why: gameReady must
+    // fire exactly once whichever caller (this loader, or the bridge's own
+    // poll on a loader-less single-file build) gets there first.
     function signalLifecycle() {
-      if (_lifecycleDone) return;
+      if (window.__plbx_gr) return;
       if (typeof window.gameReady === 'function') {
-        _lifecycleDone = true;
+        window.__plbx_gr = true;
         if (DEBUG) console.log('[plbx] Calling gameReady');
         try { window.gameReady(); } catch(e) { console.error('[plbx] gameReady error:', e); }
         return;

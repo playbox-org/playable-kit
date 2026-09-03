@@ -87,7 +87,33 @@ function buildPlbxBridge(downloadBody: string, extras?: string): string {
     ${downloadBody}
   },
   game_end: function() {},
-  game_ready: function() {},
+  // Mintegral/PlayTurbo §4 and Bigo's own gameReady are both CALLED BY THE
+  // CREATIVE (docs/networks/lifecycle-call-direction.md) — on the Cocos path
+  // the runtime loader already calls window.gameReady() itself (it doesn't
+  // wait for game code), but a single-file/free-stack build has no loader,
+  // so nobody ever called it there and Mintegral/Bigo never saw the signal.
+  // window.__plbx_gr is a SHARED flag with the loader's own gameReady call
+  // (src/packager/loader/lifecycle.ts, src/packager/runtime-loader.ts) so a
+  // Cocos build still fires it exactly once, whichever caller gets there
+  // first. If window.gameReady isn't defined yet (validator script injected
+  // late), poll — same bounded 50x100ms pattern as the loader and the MRAID
+  // defer-boot gate — then give up silently; a free-stack build packaged for
+  // a network with no validator at all (most of them) has nothing to poll
+  // for and this is a harmless no-op.
+  game_ready: function() {
+    if (window.__plbx_gr) return;
+    var tries = 0;
+    (function poll() {
+      if (window.__plbx_gr) return;
+      if (typeof window.gameReady === 'function') {
+        window.__plbx_gr = true;
+        try { window.gameReady(); } catch (e) {}
+        return;
+      }
+      tries++;
+      if (tries < 50) setTimeout(poll, 100);
+    })();
+  },
   // §6 on Mintegral (window.gameRetry); nothing to report to elsewhere.
   game_retry: function() {},
   is_audio: function() { return true; },
@@ -357,6 +383,11 @@ window.open = function(u) {
   if (window.playableSDK && playableSDK.openAppStore) { try { playableSDK.openAppStore(); } catch(e) {} return null; }
   try { return _plbxOrigOpen.apply(window, arguments); } catch(e) { return null; }
 };`,
+      // TikTok/Pangle have NO lifecycle at all (class doc above +
+      // lifecycle-call-direction.md) — the base bridge's game_ready now polls
+      // for and calls window.gameReady, a Mintegral/Bigo-only signal that
+      // does not exist on this SDK. Override back to a no-op.
+      `window.plbx_html.game_ready = function() {};`,
     ].join('\n'),
   )
 }

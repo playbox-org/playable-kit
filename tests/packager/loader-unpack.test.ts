@@ -32,4 +32,36 @@ describe('unpack + lifecycle', () => {
     expect(js).toContain('__plbx_pre_boot')
     expect(js).toContain('window.__plbx_pre_boot(doBoot)')
   })
+
+  // window.__plbx_gr is shared with plbx_html.game_ready (base.ts network
+  // adapters) so a Cocos build fires gameReady exactly once whichever caller
+  // — this loader's own poll, or the bridge's — gets there first. Isolate
+  // just the signal() IIFE (the rest of plbx_boot calls helpers this file
+  // does not define, e.g. _installPlbxUrlShim) and run it for real against a
+  // fake window.
+  it("gameReady signal is a no-op when window.__plbx_gr is already set (shared with plbx_html.game_ready)", () => {
+    const js = emitLifecycle({})
+    const signalCode = js.match(/\(function signal\(\) \{[\s\S]*?\}\)\(\);/)?.[0]
+    expect(signalCode).toBeDefined()
+
+    let calls = 0
+    const win: Record<string, unknown> = {
+      __plbx_gr: true,
+      gameReady: () => { calls++ },
+    }
+    new Function('window', 'setTimeout', signalCode!)(win, () => 0)
+    expect(calls).toBe(0)
+  })
+
+  it('gameReady signal calls window.gameReady and sets the shared flag when not already set', () => {
+    const js = emitLifecycle({})
+    const signalCode = js.match(/\(function signal\(\) \{[\s\S]*?\}\)\(\);/)?.[0]
+    expect(signalCode).toBeDefined()
+
+    let calls = 0
+    const win: Record<string, unknown> = { gameReady: () => { calls++ } }
+    new Function('window', 'setTimeout', signalCode!)(win, () => 0)
+    expect(calls).toBe(1)
+    expect(win.__plbx_gr).toBe(true)
+  })
 })

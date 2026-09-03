@@ -46,7 +46,18 @@ const REQUIRED_MEMBERS = [
   'set_size',
 ] as const
 
-function bridgeFor(networkId: string): Record<string, unknown> {
+/**
+ * Boots an adapter's injected scripts against a fake window and returns the
+ * whole window (not just plbx_html) — for lifecycle behaviour that reads a
+ * property the game/container sets ON window, like TikTok's game_ready
+ * deliberately NOT calling window.gameReady (it has no lifecycle at all).
+ * `preset` is merged into the fake window BEFORE boot, so e.g. a pre-defined
+ * window.gameReady spy is in place the moment any injected script runs.
+ */
+function windowFor(
+  networkId: string,
+  preset: Record<string, unknown> = {},
+): Record<string, unknown> {
   const builder = new HtmlBuilder(sample)
   getAdapter(networkId).transform(builder, config)
   const html = builder.toHtml()
@@ -63,6 +74,7 @@ function bridgeFor(networkId: string): Record<string, unknown> {
     setTimeout: () => 0,
     innerWidth: 320,
     innerHeight: 480,
+    ...preset,
   }
   for (const code of scripts) {
     try {
@@ -76,7 +88,11 @@ function bridgeFor(networkId: string): Record<string, unknown> {
       /* network SDK shims are not under test here */
     }
   }
-  return (win.plbx_html ?? {}) as Record<string, unknown>
+  return win
+}
+
+function bridgeFor(networkId: string): Record<string, unknown> {
+  return (windowFor(networkId).plbx_html ?? {}) as Record<string, unknown>
 }
 
 describe('plbx_html surface is identical on every network', () => {
@@ -159,6 +175,19 @@ describe('plbx_html surface is identical on every network', () => {
       ;(bridge.on_pause as (cb: () => void) => void)(() => paused++)
       expect(paused, id).toBe(1)
       expect((bridge.is_paused as () => boolean)(), id).toBe(true)
+    }
+  })
+
+  // TikTok/Pangle have NO lifecycle at all (docs/networks/lifecycle-call-
+  // direction.md) — game_ready must stay a no-op there, never reach for
+  // window.gameReady the way Mintegral/Bigo's does.
+  it('tiktok/pangle game_ready does NOT call window.gameReady (no lifecycle on this SDK)', () => {
+    for (const id of ['tiktok', 'pangle']) {
+      let calls = 0
+      const win = windowFor(id, { gameReady: () => { calls++ } })
+      const bridge = win.plbx_html as Record<string, (...a: unknown[]) => unknown>
+      ;(bridge.game_ready as () => void)()
+      expect(calls, id).toBe(0)
     }
   })
 })

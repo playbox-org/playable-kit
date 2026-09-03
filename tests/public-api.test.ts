@@ -51,7 +51,7 @@ const REQUIRED_EXPORTS = [
   'forbiddenStringsFor',
   'NETWORK_FORBIDDEN_STRINGS',
   'FORBIDDEN_STRING_HINTS',
-  // added in 0.3.14 — free-stack single-file path
+  // added in 0.3.15 — free-stack single-file path
   'detectInputKind',
   'applySingleFileRewrite',
   'SINGLE_FILE_SPLASH_HOOK_JS',

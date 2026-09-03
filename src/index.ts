@@ -34,7 +34,7 @@ export {
   SINGLE_FILE_SPLASH_HOOK_JS,
 } from './packager/splash'
 export type { SplashOptions, SplashParts } from './packager/splash'
-// Single-file input path (0.3.14 — free-stack SDK: Vite/Three.js builds that
+// Single-file input path (0.3.15 — free-stack SDK: Vite/Three.js builds that
 // are already one self-contained index.html, no runtime loader).
 export { detectInputKind, applySingleFileRewrite } from './packager/single-file'
 export type { InputKind } from './packager/single-file'

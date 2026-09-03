@@ -13,7 +13,8 @@ packager service, the CLI and the extension can share one implementation.
   (no `fs`/node deps; safe for browser bundles).
 - `@playbox-ai/playable-kit/types` — types only, zero runtime.
 - `@playbox-ai/playable-kit/sdk` — game-side SDK for non-Cocos builds
-  (Vite / Three.js / Pixi). Browser-only, zero deps.
+  (Vite / Three.js / Pixi). Browser-only, zero deps; also `dist/sdk.iife.js` →
+  `window.plbx` for script-tag use.
 
 ## Free-stack builds (Vite / Three.js / Pixi)
 

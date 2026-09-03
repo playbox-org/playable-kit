@@ -39,4 +39,19 @@ export default defineConfig([
       __KIT_VERSION__: JSON.stringify(pkg.version),
     },
   },
+  {
+    // Script-tag build of the SDK for free-stack builds with no bundler step
+    // of their own: `<script src="sdk.iife.js"></script>` leaves `window.plbx`
+    // ready to use, same object the `@playbox-ai/playable-kit/sdk` import gives.
+    entry: { 'sdk.iife': 'src/sdk/index.ts' },
+    format: ['iife'],
+    globalName: 'plbxSdk',
+    dts: false,
+    clean: false,
+    minify: true,
+    define: {
+      __KIT_VERSION__: JSON.stringify(pkg.version),
+    },
+    footer: { js: 'window.plbx = plbxSdk.plbx;' },
+  },
 ])

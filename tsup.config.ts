@@ -29,8 +29,10 @@ export default defineConfig([
     entry: { cli: 'src/cli.ts' },
     format: ['cjs'],
     dts: false,
-    // Must NOT clean — this config builds after the entry above and clean:true
-    // would wipe its output (index/networks/types/sdk .js/.cjs/.d.ts).
+    // Must NOT clean — tsup runs multi-config arrays concurrently, and a
+    // second clean:true here would race-delete the other config's output
+    // (index/networks/types/sdk .js/.cjs/.d.ts) instead of just clearing dist/
+    // once up front.
     clean: false,
     banner: { js: '#!/usr/bin/env node' },
     define: {

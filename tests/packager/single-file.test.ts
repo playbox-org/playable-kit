@@ -5,8 +5,9 @@ import { afterAll, describe, expect, it } from 'vitest'
 import { packageForNetworks } from '../../src/packager/packager'
 import { detectInputKind } from '../../src/packager/single-file'
 import { HtmlBuilder } from '../../src/packager/html-builder'
-import { NETWORKS, getNetwork } from '../../src/networks'
+import { NETWORKS, getNetwork, maxSizeForFormat } from '../../src/networks'
 import { getAdapter } from '../../src/packager/network-adapters'
+import { validateArtifact } from '../../src/validation/validate-artifact'
 
 const FIXTURES = join(__dirname, '../fixtures')
 const BUILD = join(FIXTURES, 'single-file-build')
@@ -138,5 +139,35 @@ describe('single-file packaging — every network', () => {
     // hideJs), which only the single-file path would inject.
     expect(payload).not.toContain('id="s"')
     expect(payload).not.toContain('window.__plbx_splash_hide=function(')
+  })
+
+  it('single-file artifacts pass validateArtifact with no failed checks (no runtime loader to fault)', async () => {
+    const result = await packageForNetworks({
+      buildDir: BUILD, outputDir: OUT, networks: ['applovin', 'facebook'],
+      config: { orientation: 'portrait' }, templateVariables: { assetTitle: 'Fixture Game' },
+      packagerVersion: '0.3.14',
+    })
+    for (const r of result.results) {
+      // dualFormat networks (facebook) emit two results per network id, e.g.
+      // "facebook-html"/"facebook-zip" — the network registry only knows the
+      // base id.
+      const baseId = r.networkId.replace(/-(html|zip)$/, '')
+      const network = getNetwork(baseId)!
+      const html = await primaryHtml(r.outputPath)
+      const checks = validateArtifact({
+        networkId: baseId,
+        html,
+        buildDir: BUILD,
+        files: [
+          {
+            kind: r.format as 'html' | 'zip',
+            sizeBytes: r.outputSize,
+            maxSizeBytes: maxSizeForFormat(network, r.format),
+          },
+        ],
+      })
+      const failed = checks.filter((c) => c.status === 'failed')
+      expect(failed, `${r.networkId} (${r.format})`).toEqual([])
+    }
   })
 })

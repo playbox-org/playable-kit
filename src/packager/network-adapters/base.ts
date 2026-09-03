@@ -106,6 +106,29 @@ function buildPlbxBridge(downloadBody: string, extras?: string): string {
   // Luna reports real mute state through this; elsewhere the container never
   // changes it, so a subscriber gets the current value once and nothing more.
   on_mute_change: function(cb) { if (typeof cb === 'function') { try { cb(this.is_muted()); } catch (e) {} } },
+  // Container signals: paused = not viewable / page hidden / host said so.
+  // Subscribers replay: on_pause fires at once when already paused, on_resize
+  // at once with the current size — same late-subscriber rule as on_*.
+  // set_paused / set_size are called by the adapter's signal script (below the
+  // bridge) and by preview mocks; game code only subscribes.
+  _paused: false,
+  _pause_subs: [],
+  _resume_subs: [],
+  _resize_subs: [],
+  is_paused: function() { return this._paused; },
+  on_pause: function(cb) { if (typeof cb !== 'function') return; this._pause_subs.push(cb); if (this._paused) { try { cb(); } catch (e) {} } },
+  on_resume: function(cb) { if (typeof cb !== 'function') return; this._resume_subs.push(cb); },
+  on_resize: function(cb) { if (typeof cb !== 'function') return; this._resize_subs.push(cb); try { cb(window.innerWidth, window.innerHeight); } catch (e) {} },
+  set_paused: function(p) {
+    p = !!p;
+    if (p === this._paused) return;
+    this._paused = p;
+    var subs = p ? this._pause_subs : this._resume_subs;
+    for (var i = 0; i < subs.length; i++) { try { subs[i](); } catch (e) {} }
+  },
+  set_size: function(w, h) {
+    for (var i = 0; i < this._resize_subs.length; i++) { try { this._resize_subs[i](w, h); } catch (e) {} }
+  },
   report: function() {},
   tap: function() {},
   external_commands: [],
@@ -190,6 +213,35 @@ export function mraidDeferBootGate(): string {
     if (n > 0) setTimeout(function() { poll(n - 1); }, 200);
   })(50);
 };`
+}
+
+/**
+ * Container → bridge signal wiring for pause/resume/resize. Injected right
+ * after the bridge on every network. Page visibility + window resize are the
+ * baseline every container has; MRAID adds its own viewability, state and
+ * size events (Unity's MRAID never fires sizeChange, so the window listener
+ * is what covers it there). Never throws: a stub container missing any of
+ * these is a no-op, not a broken ad.
+ */
+export function lifecycleSignals(mraid: boolean): string {
+  const mraidPart = mraid
+    ? `
+  function attach() {
+    try { mraid.addEventListener('viewableChange', function(v) { b.set_paused(!v); }); } catch(e) {}
+    try { mraid.addEventListener('stateChange', function(s) { if (s === 'hidden') b.set_paused(true); }); } catch(e) {}
+    try { mraid.addEventListener('sizeChange', function(w, h) { b.set_size(w, h); }); } catch(e) {}
+    try { if (typeof mraid.isViewable === 'function' && !mraid.isViewable()) b.set_paused(true); } catch(e) {}
+  }
+  if (window.mraid) {
+    try { (mraid.getState && mraid.getState() === 'loading') ? mraid.addEventListener('ready', attach) : attach(); } catch(e) {}
+  }`
+    : ''
+  return `(function() {
+  var b = window.plbx_html;
+  if (!b || typeof b.set_paused !== 'function') return;
+  try { document.addEventListener('visibilitychange', function() { b.set_paused(document.visibilityState === 'hidden'); }); } catch(e) {}
+  try { window.addEventListener('resize', function() { b.set_size(window.innerWidth, window.innerHeight); }); } catch(e) {}${mraidPart}
+})();`
 }
 
 /** Facebook/Moloco bridge */
@@ -564,8 +616,8 @@ function _plbx_luna_audio(muted) {
     for (var j = 0; j < m.length; j++) { m[j].muted = muted; }
   } catch(e) {}
 }
-window.addEventListener('luna:pause', function() { try { if (window.cc && cc.game) cc.game.pause(); } catch(e) {} });
-window.addEventListener('luna:resume', function() { try { if (window.cc && cc.game) cc.game.resume(); } catch(e) {} });
+window.addEventListener('luna:pause', function() { try { if (window.cc && cc.game) cc.game.pause(); } catch(e) {} try { window.plbx_html.set_paused(true); } catch(e) {} });
+window.addEventListener('luna:resume', function() { try { if (window.cc && cc.game) cc.game.resume(); } catch(e) {} try { window.plbx_html.set_paused(false); } catch(e) {} });
 window.addEventListener('luna:mute', function() { _plbx_luna_audio(true); });
 window.addEventListener('luna:unmute', function() { _plbx_luna_audio(false); });`,
   )
@@ -618,6 +670,7 @@ export class BaseAdapter implements NetworkAdapter {
       .filter(Boolean)
       .join('\n')
     builder.injectBodyScript(bridge + (storeSetup ? '\n' + storeSetup : ''))
+    builder.injectBodyScript(lifecycleSignals(this.networkConfig.mraid))
 
     // Inject custom head from config
     if (config.customInjectHead) {

@@ -37,6 +37,12 @@ const REQUIRED_MEMBERS = [
   'report',
   'tap',
   'expose',
+  'is_paused',
+  'on_pause',
+  'on_resume',
+  'on_resize',
+  'set_paused',
+  'set_size',
 ] as const
 
 function bridgeFor(networkId: string): Record<string, unknown> {
@@ -54,6 +60,8 @@ function bridgeFor(networkId: string): Record<string, unknown> {
     addEventListener: () => {},
     document: { querySelectorAll: () => [] },
     setTimeout: () => 0,
+    innerWidth: 320,
+    innerHeight: 480,
   }
   for (const code of scripts) {
     try {
@@ -120,6 +128,22 @@ describe('plbx_html surface is identical on every network', () => {
         seen.push(m)
       })
       expect(seen, id).toEqual([false])
+    }
+  })
+
+  it('on_pause/on_resize replay current state to a late subscriber', () => {
+    for (const id of ['applovin', 'mintegral', 'luna', 'tiktok']) {
+      const bridge = bridgeFor(id)
+      const sizes: unknown[] = []
+      ;(bridge.on_resize as (cb: (w: number, h: number) => void) => void)(
+        (w, h) => sizes.push([w, h]),
+      )
+      expect(sizes.length, id).toBe(1)
+      let paused = 0
+      ;(bridge.set_paused as (p: boolean) => void)(true)
+      ;(bridge.on_pause as (cb: () => void) => void)(() => paused++)
+      expect(paused, id).toBe(1)
+      expect((bridge.is_paused as () => boolean)(), id).toBe(true)
     }
   })
 })

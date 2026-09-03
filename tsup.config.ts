@@ -49,6 +49,11 @@ export default defineConfig([
     dts: false,
     clean: false,
     minify: true,
+    // tsup's default iife naming inserts a ".global" infix (sdk.iife.global.js)
+    // to disambiguate a multi-format build of the SAME entry name — this entry
+    // only ever builds iife, so the plain name is unambiguous and matches the
+    // documented `dist/sdk.iife.js` path.
+    outExtension: () => ({ js: '.js' }),
     define: {
       __KIT_VERSION__: JSON.stringify(pkg.version),
     },

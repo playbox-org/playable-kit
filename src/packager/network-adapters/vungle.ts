@@ -1,3 +1,4 @@
+import { HtmlBuilder } from '../html-builder'
 import { NetworkConfig, PackageConfig } from '../../types'
 import { BaseAdapter, vungleBridge } from './base'
 
@@ -15,5 +16,15 @@ export class VungleAdapter extends BaseAdapter {
 
   protected getPlbxBridge(_config: PackageConfig): string {
     return vungleBridge()
+  }
+
+  transform(builder: HtmlBuilder, config: PackageConfig): void {
+    // Vungle's Adaptive Creative WebView predates globalThis, and any es2020+
+    // bundle in the game (including our own bridge/lifecycle scripts) reaches
+    // for it unconditionally — a bare reference throws ReferenceError before
+    // a single line of the ad runs. Must precede every other injected script
+    // (the bridge included), hence BEFORE super.transform().
+    builder.injectBodyScript('window.globalThis=window.globalThis||window;')
+    super.transform(builder, config)
   }
 }

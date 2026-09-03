@@ -753,6 +753,27 @@ describe('Network Adapters', () => {
         expect(html, `Vungle HTML leaked "${needle}"`).not.toContain(needle)
       }
     })
+
+    it('injects a globalThis shim before every other script (old WebView predates globalThis)', () => {
+      const adapter = getAdapter('vungle')
+      const builder = new HtmlBuilder(sampleHtml)
+      adapter.transform(builder, defaultConfig)
+      const html = builder.toHtml()
+      const shim = 'window.globalThis=window.globalThis||window;'
+      const shimAt = html.indexOf(shim)
+      const bridgeAt = html.indexOf('window.plbx_html = window.plbx_html ||')
+      expect(shimAt).toBeGreaterThan(-1)
+      expect(bridgeAt).toBeGreaterThan(-1)
+      expect(shimAt).toBeLessThan(bridgeAt)
+    })
+
+    it('a non-Vungle network does not carry the globalThis shim', () => {
+      const adapter = getAdapter('facebook')
+      const builder = new HtmlBuilder(sampleHtml)
+      adapter.transform(builder, defaultConfig)
+      const html = builder.toHtml()
+      expect(html).not.toContain('window.globalThis=window.globalThis||window;')
+    })
   })
 
   describe('Non-MRAID networks without SDK', () => {

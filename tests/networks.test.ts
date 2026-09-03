@@ -130,6 +130,10 @@ describe('NETWORKS registry', () => {
     expect(n.maxSize).toBe(5 * 1024 * 1024)
   })
 
+  it('vungle names the inner HTML ad.html (Adaptive Creative spec)', () => {
+    expect(getNetwork('vungle')!.htmlFileName).toBe('ad.html')
+  })
+
   it('getAllNetworks should return all networks', () => {
     const all = getAllNetworks()
     expect(all.length).toBe(Object.keys(NETWORKS).length)

@@ -642,8 +642,15 @@ export class BaseAdapter implements NetworkAdapter {
       // Defer Cocos boot until mraid.isViewable() — fixes video+playable combo black screen
       builder.injectBodyScript(mraidDeferBootGate())
     }
-    // Inject SDK URL if specified
-    if (this.networkConfig.sdkUrl) {
+    // Inject SDK URL if specified.
+    // TikTok's spec: "Place the following code at the bottom of body and
+    // before the developer's own JS." Body end it is; the single-file path
+    // moves the game bundle after this, the Cocos loader boots later anyway.
+    // Google is the exception — ExitApi must follow its ad.size/ad.orientation
+    // metas in <head>, and GoogleAdapter owns that order.
+    if (this.networkConfig.sdkUrl && this.networkId !== 'google') {
+      builder.injectBodyScriptSrc(this.networkConfig.sdkUrl)
+    } else if (this.networkConfig.sdkUrl) {
       builder.injectHeadScript(this.networkConfig.sdkUrl)
     }
     // Inject SDK inline JS if specified

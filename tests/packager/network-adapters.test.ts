@@ -765,4 +765,28 @@ describe('Network Adapters', () => {
       })
     })
   })
+
+  describe('network SDK tag position', () => {
+    const html = '<!DOCTYPE html><html><head></head><body><canvas></canvas></body></html>'
+    const config = { orientation: 'portrait' as const }
+
+    for (const id of ['tiktok', 'pangle', 'bigo', 'gdt']) {
+      it(`${id}: the SDK script sits at the end of body, after the bridge`, () => {
+        const b = new HtmlBuilder(html)
+        getAdapter(id).transform(b, config)
+        const out = b.toHtml()
+        const sdkAt = out.indexOf('<script src="https://')
+        expect(sdkAt).toBeGreaterThan(out.indexOf('<canvas'))
+        expect(sdkAt).toBeLessThan(out.indexOf('</body>'))
+        expect(out.indexOf('</head>')).toBeLessThan(sdkAt)
+      })
+    }
+
+    it('google keeps exitapi.js in head (its meta tags must precede it)', () => {
+      const b = new HtmlBuilder(html)
+      getAdapter('google').transform(b, config)
+      const out = b.toHtml()
+      expect(out.indexOf('exitapi.js')).toBeLessThan(out.indexOf('</head>'))
+    })
+  })
 })

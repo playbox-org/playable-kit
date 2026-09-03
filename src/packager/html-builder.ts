@@ -94,25 +94,37 @@ export class HtmlBuilder {
    * A `file://` container refuses module scripts ("Do not use crossorigin,
    * type=module…"), so the attributes go. Without `type="module"` an inline
    * script is no longer deferred — it runs where it stands, and a Vite build
-   * puts it in <head>, before <body> exists. So the bundle (the largest inline
-   * script) is moved to the very end of <body>: after the DOM it queries and
-   * after every bridge script the adapters appended. cheerio's append() MOVES
-   * an existing node, so the bundle is not duplicated.
+   * puts it in <head>, before <body> exists. So the bundle is moved to the
+   * very end of <body>: after the DOM it queries and after every bridge
+   * script the adapters appended. cheerio's append() MOVES an existing node,
+   * so the bundle is not duplicated.
+   *
+   * Which script IS the bundle: prefer the original `type="module"` script —
+   * that is vite-plugin-singlefile's unambiguous marker for the entry bundle,
+   * present before any adapter/bridge code is injected. Only when no script
+   * carries it (an already-classic single-file build) fall back to the
+   * longest inline script — a real bundle dwarfs any bridge/lifecycle script
+   * we inject, but a bridge script (e.g. the ~4KB MRAID bridge) CAN outsize a
+   * tiny synthetic bundle, so the length heuristic alone is not reliable.
    */
   toClassicBundle(): void {
-    let bundle: ReturnType<CheerioAPI> | null = null
-    let bundleLen = -1
+    let moduleScript: ReturnType<CheerioAPI> | null = null
+    let longest: ReturnType<CheerioAPI> | null = null
+    let longestLen = -1
     this.$('script').each((_, el) => {
       const $el = this.$(el)
-      if ($el.attr('type') === 'module') $el.removeAttr('type')
+      const isModule = $el.attr('type') === 'module'
+      if (isModule) $el.removeAttr('type')
       $el.removeAttr('crossorigin')
       if ($el.attr('src')) return
+      if (isModule && !moduleScript) moduleScript = $el
       const len = ($el.html() || '').length
-      if (len > bundleLen) {
-        bundleLen = len
-        bundle = $el
+      if (len > longestLen) {
+        longestLen = len
+        longest = $el
       }
     })
+    const bundle = moduleScript || longest
     if (bundle) this.$('body').append(bundle)
   }
 

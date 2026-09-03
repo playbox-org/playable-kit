@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <title>Single File Fixture</title>
+  <script type="module" crossorigin>(function(){"use strict";var c=document.getElementById("game");window.__fixture={canvas:!!c,bridge:typeof window.plbx_html,booted:false};var b=window.plbx_html;if(b&&typeof b.on_game_start==="function"){b.on_game_start(function(){window.__fixture.started=true})}var boot=function(){window.__fixture.booted=true;if(b&&b.game_ready)b.game_ready()};if(typeof window.__plbx_pre_boot==="function"){window.__plbx_pre_boot(boot)}else{boot()}})();</script>
+  <style>html,body{margin:0;background:#000}#game{width:100%;height:100%}</style>
+</head>
+<body>
+  <canvas id="game"></canvas>
+</body>
+</html>

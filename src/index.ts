@@ -31,8 +31,14 @@ export {
   MIN_LOGO_SCALE,
   MAX_LOGO_SCALE,
   FIRST_FRAME_HOOK_JS,
+  SINGLE_FILE_SPLASH_HOOK_JS,
 } from './packager/splash'
 export type { SplashOptions, SplashParts } from './packager/splash'
+// Single-file input path (0.3.14 — free-stack SDK: Vite/Three.js builds that
+// are already one self-contained index.html, no runtime loader).
+export { detectInputKind, applySingleFileRewrite } from './packager/single-file'
+export type { InputKind } from './packager/single-file'
+export { htmlToPayloadJs } from './packager/runtime-loader'
 
 // Validation
 export {

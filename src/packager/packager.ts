@@ -27,7 +27,12 @@ import {
 import { PackagerOptions, PackagerResult } from './types'
 import { packDirectoryToZip } from './asset-inliner'
 import { rewriteCocosJs, shouldRewriteCocosJs } from './cocos-js-rewriter'
-import { generateFullHtml, generatePayloadJs } from './runtime-loader'
+import {
+  generateFullHtml,
+  generatePayloadJs,
+  htmlToPayloadJs,
+} from './runtime-loader'
+import { detectInputKind, applySingleFileRewrite } from './single-file'
 import {
   buildLauncher,
   fillLauncherPayloadUrl,
@@ -97,6 +102,17 @@ export async function packageForNetworks(
     throw new Error(`Build HTML not found: ${htmlPath}`)
   }
   const baseHtml = readFileSync(htmlPath, 'utf-8')
+
+  const inputKind = detectInputKind(
+    new HtmlBuilder(baseHtml),
+    options.config.input,
+  )
+  const splashOpts = (cfg: PackageConfig) =>
+    cfg.showSplash === false
+      ? null
+      : splashLogoDataUrl
+        ? { customLogo: { dataUrl: splashLogoDataUrl }, logoScale: cfg.splashLogoScale }
+        : {}
 
   // Optional client splash logo — read once, shared across networks. Unreadable
   // path / unsupported type falls back to the default PLBX splash (no hard fail).
@@ -238,6 +254,15 @@ export async function packageForNetworks(
         builder.injectHeadComment(hostileMp3Marker(hostileMp3))
       }
 
+      // Single-file input: the build IS the artifact. Splash + classic-bundle
+      // rewrite happen on the builder itself so every branch below (inline
+      // HTML, single-file ZIP, plain ZIP, launcher payload) ships the same
+      // document. The loader path leaves the builder alone and lets
+      // generateFullHtml rewrite it.
+      if (inputKind === 'single-file') {
+        applySingleFileRewrite(builder, splashOpts(packageConfig))
+      }
+
       // Non-fatal warning: a network whose validator requires a Google Play Store
       // URL (e.g. Unity) but none was found in the build. We don't abort — the
       // missing URL will surface at the network's own validation step.
@@ -339,29 +364,26 @@ export async function packageForNetworks(
         // Apply the same cocos-js rewrite as the main path (currentScript/new URL +
         // for self-contained also XMLHttpRequest/createElement → FB-safe shims).
         const launcherSelfContained = launcherLoaderMode === 'self-contained'
-        const zipBuffer = await packDirectoryToZip(
-          options.buildDir,
-          undefined,
-          {
-            excludeExtensions: ['.css', '.html'],
-            transform: (path, content) =>
-              shouldRewriteCocosJs(path)
-                ? rewriteCocosJs(content.toString('utf-8'), {
-                    selfContained: launcherSelfContained,
+        const payloadJs =
+          inputKind === 'single-file'
+            ? htmlToPayloadJs(builder.toHtml())
+            : generatePayloadJs({
+                originalHtml: builder.toHtml(),
+                zipBase64: (
+                  await packDirectoryToZip(options.buildDir, undefined, {
+                    excludeExtensions: ['.css', '.html'],
+                    transform: (path, content) =>
+                      shouldRewriteCocosJs(path)
+                        ? rewriteCocosJs(content.toString('utf-8'), {
+                            selfContained: launcherSelfContained,
+                          })
+                        : null,
                   })
-                : null,
-          },
-        )
-        const zipBase64 = zipBuffer.toString('base64')
-        const cssContent = extractAndMinifyCss(options.buildDir)
-
-        const payloadJs = generatePayloadJs({
-          originalHtml: builder.toHtml(),
-          zipBase64,
-          cssContent,
-          buildDir: options.buildDir,
-          loaderMode: launcherLoaderMode,
-        })
+                ).toString('base64'),
+                cssContent: extractAndMinifyCss(options.buildDir),
+                buildDir: options.buildDir,
+                loaderMode: launcherLoaderMode,
+              })
 
         const assetTitle =
           options.templateVariables?.assetTitle ||
@@ -516,33 +538,39 @@ export async function packageForNetworks(
           // cocos-js-rewriter.ts) — обходит emscripten currentScript-trap; для
           // self-contained также XMLHttpRequest→_XMLLocalRequest и createElement
           // script→_createLocalJSElement (FB-safe, движок грузит из кеша).
-          const selfContained = effectiveLoaderMode === 'self-contained'
-          const zipBuffer = await packDirectoryToZip(
-            options.buildDir,
-            undefined,
-            {
-              excludeExtensions: ['.css', '.html'],
-              transform: (path, content) =>
-                shouldRewriteCocosJs(path)
-                  ? rewriteCocosJs(content.toString('utf-8'), { selfContained })
-                  : null,
-            },
-          )
-          const zipBase64 = zipBuffer.toString('base64')
-
-          // Extract and minify CSS for inline injection
-          const cssContent = extractAndMinifyCss(options.buildDir)
-
-          const finalHtml = generateFullHtml({
-            originalHtml: builder.toHtml(),
-            zipBase64,
-            cssContent,
-            buildDir: options.buildDir,
-            loaderMode: effectiveLoaderMode,
-            showSplash: packageConfig.showSplash !== false,
-            splashLogoDataUrl,
-            splashLogoScale: packageConfig.splashLogoScale,
-          })
+          let zipBase64 = ''
+          let cssContent = ''
+          let finalHtml: string
+          if (inputKind === 'single-file') {
+            finalHtml = builder.toHtml()
+          } else {
+            const selfContained = effectiveLoaderMode === 'self-contained'
+            const zipBuffer = await packDirectoryToZip(
+              options.buildDir,
+              undefined,
+              {
+                excludeExtensions: ['.css', '.html'],
+                transform: (path, content) =>
+                  shouldRewriteCocosJs(path)
+                    ? rewriteCocosJs(content.toString('utf-8'), {
+                        selfContained,
+                      })
+                    : null,
+              },
+            )
+            zipBase64 = zipBuffer.toString('base64')
+            cssContent = extractAndMinifyCss(options.buildDir)
+            finalHtml = generateFullHtml({
+              originalHtml: builder.toHtml(),
+              zipBase64,
+              cssContent,
+              buildDir: options.buildDir,
+              loaderMode: effectiveLoaderMode,
+              showSplash: packageConfig.showSplash !== false,
+              splashLogoDataUrl,
+              splashLogoScale: packageConfig.splashLogoScale,
+            })
+          }
 
           assertNoForbiddenStrings(
             finalHtml,
@@ -626,10 +654,10 @@ export async function packageForNetworks(
             // Per-encoding emit (self-contained only). The chosen encoding writes the
             // primary `index.html`. In "both" (A/B) mode base122 keeps the bare name
             // and the base64 sibling carries a `.b64` suffix.
-            const encodings = resolveInlinedEncodings(
-              packageConfig,
-              effectiveLoaderMode,
-            )
+            const encodings =
+              inputKind === 'single-file'
+                ? (['base64'] as const)
+                : resolveInlinedEncodings(packageConfig, effectiveLoaderMode)
             const multi = encodings.length > 1
             for (const enc of encodings) {
               const html =

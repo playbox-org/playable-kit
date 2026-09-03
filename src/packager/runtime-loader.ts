@@ -866,8 +866,16 @@ export function generatePayloadJs(params: {
   /** Effective loader engine (per-network). Forwarded to generateFullHtml. */
   loaderMode?: 'self-contained' | 'systemjs'
 }): string {
-  const fullHtml = generateFullHtml(params)
+  return htmlToPayloadJs(generateFullHtml(params))
+}
 
+/**
+ * Wrap a finished single-document HTML as a Moloco V2 payload.js: strip what
+ * the launcher already provides, then an IIFE that injects the remaining
+ * <head> and <body> into the live document. Engine-agnostic — used by both
+ * the loader path (via generatePayloadJs) and the single-file path.
+ */
+export function htmlToPayloadJs(fullHtml: string): string {
   const $ = cheerio.load(fullHtml, {
     decodeEntities: false,
   } as unknown as Parameters<typeof cheerio.load>[1])

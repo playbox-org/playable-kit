@@ -71,6 +71,12 @@ export interface PackageConfig {
    *  luna.json `applicationName` / playground.json `title`). Filled by the
    *  packager from templateVariables when a caller left it empty. */
   appName?: string
+  /** Input kind. 'loader' = pack assets + Cocos/engine-agnostic runtime loader
+   *  (the only path before 0.3.14). 'single-file' = the build is already one
+   *  self-contained index.html (Vite singlefile, IIFE bundle): no loader, the
+   *  adapters run on it directly. 'auto' (default) = single-file when the HTML
+   *  references no local file. */
+  input?: 'auto' | 'loader' | 'single-file'
 }
 
 export interface AssetReportItem {

@@ -699,18 +699,24 @@ export function generatePreviewUtil(params: PreviewUtilParams): string {
     parts.push(`
   // TikTok/Pangle playable SDK — WRAP the real SDK, don't replace it, so the
   // validator tests the honest build. The build's external playable-sdk.js
-  // loads normally (all ~44 real methods stay live); we only decorate the 3
-  // observable calls so the checklist sees CTA + lifecycle, then delegate to
-  // the real method. The real SDK assigns window.playableSDK as a plain,
+  // loads normally (all 39 real methods stay live); we only decorate the one
+  // observable call so the checklist sees the CTA, then delegate to the real
+  // method. The real SDK assigns window.playableSDK as a plain,
   // configurable data property, so an accessor trap installed here (before the
   // SDK <script> runs) catches the assignment. Idempotent per-method decoration
   // + a bounded poll cover late attachment / reassignment; if the SDK never
   // loads (offline / CDN blocked) an install-once mock keeps preview working.
+  //
+  // BEACON is CTA-only, and must stay that way: decorate() assigns a wrapper
+  // even when the real SDK has no such method (orig === null), so listing a
+  // name here MANUFACTURES it. reportGameReady/reportGameClose used to be
+  // listed; the live playable-sdk.js has neither, so the bridge's typeof guard
+  // passed in preview and failed in production — the checklist went green over
+  // a call that never happens. Never decorate a method the real SDK does not
+  // expose.
   (function() {
     var BEACON = {
-      openAppStore:    function() { report('cta', { method: 'playable_sdk' }); },
-      reportGameReady: function() { report('game_ready', { method: 'playableSDK.reportGameReady' }); },
-      reportGameClose: function() { report('game_end', { method: 'playableSDK.reportGameClose' }); }
+      openAppStore: function() { report('cta', { method: 'playable_sdk' }); }
     };
     function decorate(sdk) {
       if (!sdk) return sdk;

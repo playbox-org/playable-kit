@@ -73,6 +73,33 @@ describe('no_forbidden_literals check', () => {
   })
 })
 
+// TikTok/Pangle have no lifecycle. The live playable-sdk.js exposes 39 methods
+// and none is gameReady/gameStart/gameClose/reportGameReady/reportGameClose, and
+// TikTok's spec asks the creative for window.openAppStore() alone: "The
+// accessing party does not need to call for the download or page jump
+// operations by themselves. These operations are handled by the js-sdk."
+// The rows were a Mintegral carryover telling creators to call a missing API.
+describe('TikTok/Pangle carry no lifecycle checks', () => {
+  for (const id of ['tiktok', 'pangle']) {
+    it(`${id} has no gameReady/gameStart/game_end rows`, () => {
+      const ids = getNetworkChecks(id, false).map((c) => c.id)
+      expect(ids).not.toContain('game_ready')
+      expect(ids).not.toContain('game_start')
+      expect(ids).not.toContain('game_end')
+    })
+
+    it(`${id} still checks the CTA it does require`, () => {
+      const ids = getNetworkChecks(id, false).map((c) => c.id)
+      expect(ids).toContain('cta')
+    })
+  }
+
+  it('mintegral keeps its full lifecycle', () => {
+    const ids = getNetworkChecks('mintegral', false).map((c) => c.id)
+    expect(ids).toEqual(expect.arrayContaining(['game_ready', 'game_start', 'game_end']))
+  })
+})
+
 // Vungle's Adaptive Creative rule is the opposite of Mintegral's: `complete` and the
 // CTA's `download` must NEVER fire together, and completion only reaches the container
 // through the bridge (plbx_html.game_end → parent.postMessage('complete', '*')). The

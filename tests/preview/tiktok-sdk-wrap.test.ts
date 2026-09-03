@@ -67,10 +67,21 @@ describe('TikTok/Pangle SDK wrap', () => {
     const { win, reports, tick } = loadWrap('tiktok')
     const sdk: any = {}
     win.playableSDK = sdk // empty at assign time
-    sdk.reportGameReady = () => {} // real SDK attaches later
+    sdk.openAppStore = () => {} // real SDK attaches later
     tick() // bounded poll re-wraps
-    win.playableSDK.reportGameReady()
-    expect(reports.map((r) => r.event)).toContain('game_ready')
+    win.playableSDK.openAppStore()
+    expect(reports.map((r) => r.event)).toContain('cta')
+  })
+
+  // decorate() assigns a wrapper even when the real SDK has no such method, so
+  // anything listed in BEACON is MANUFACTURED. reportGameReady/reportGameClose
+  // were listed and do not exist in the live SDK: preview reported them, the
+  // bridge's typeof guard passed there and failed in production.
+  it('never manufactures a method the real SDK does not expose', () => {
+    const { win } = loadWrap('tiktok')
+    win.playableSDK = { openAppStore: () => {} }
+    expect(typeof win.playableSDK.reportGameReady).toBe('undefined')
+    expect(typeof win.playableSDK.reportGameClose).toBe('undefined')
   })
 
   it('falls back to a mock when no real SDK ever loads (offline)', () => {

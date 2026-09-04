@@ -118,4 +118,109 @@ describe('HtmlBuilder', () => {
     expect(headContent).not.toContain('&quest;')
     expect(headContent).not.toContain('&#61;')
   })
+
+  describe('single-file helpers', () => {
+    const vite =
+      '<!DOCTYPE html><html><head><meta charset="utf-8">' +
+      '<script type="module" crossorigin>(function(){window.__bundle=1})();</script>' +
+      '<style>body{margin:0}</style></head>' +
+      '<body><canvas id="game"></canvas></body></html>'
+
+    it('injectBodyScriptSrc appends a src script at the end of body', () => {
+      const b = new HtmlBuilder(vite)
+      b.injectBodyScriptSrc('https://cdn.example/sdk.js')
+      const html = b.toHtml()
+      const at = html.indexOf('<script src="https://cdn.example/sdk.js"></script>')
+      expect(at).toBeGreaterThan(html.indexOf('<canvas'))
+      expect(at).toBeLessThan(html.indexOf('</body>'))
+    })
+
+    it('injectHeadStyle and prependBody land where the splash needs them', () => {
+      const b = new HtmlBuilder(vite)
+      b.injectHeadStyle('#s{color:red}')
+      b.prependBody('<div id="s">splash</div>')
+      const html = b.toHtml()
+      expect(html.indexOf('<style>#s{color:red}</style>')).toBeLessThan(html.indexOf('</head>'))
+      expect(html.indexOf('<div id="s">')).toBeLessThan(html.indexOf('<canvas'))
+    })
+
+    it('getLocalRefs ignores http(s) and mraid.js', () => {
+      const b = new HtmlBuilder(
+        '<html><head><script src="mraid.js"></script>' +
+          '<script src="https://x/y.js"></script>' +
+          '<link rel="stylesheet" href="style.css"></head>' +
+          '<body><script src="game.js"></script></body></html>',
+      )
+      expect(b.getLocalRefs()).toEqual(['game.js', 'style.css'])
+      expect(new HtmlBuilder(vite).getLocalRefs()).toEqual([])
+    })
+
+    it('getLocalRefs also collects local media/link refs, grouped scripts-then-stylesheets-then-rest', () => {
+      const b = new HtmlBuilder(
+        '<html><head>' +
+          '<script type="module">console.log(1)</script>' +
+          '</head><body>' +
+          '<img src="logo.png">' +
+          '<link rel="icon" href="fav.ico">' +
+          '</body></html>',
+      )
+      // "the rest" is walked in document order — img before the link here —
+      // and comes after the (empty) scripts/stylesheets groups above it.
+      expect(b.getLocalRefs()).toEqual(['logo.png', 'fav.ico'])
+    })
+
+    it('getLocalRefs ignores data:/blob: URLs on media and non-stylesheet links', () => {
+      const b = new HtmlBuilder(
+        '<html><head>' +
+          '<link rel="manifest" href="data:application/json;base64,e30=">' +
+          '</head><body>' +
+          '<img src="blob:http://x/1">' +
+          '<audio src="https://cdn.example.com/a.mp3"></audio>' +
+          '<video src="movie.mp4"></video>' +
+          '<source src="clip.webm">' +
+          '</body></html>',
+      )
+      expect(b.getLocalRefs()).toEqual(['movie.mp4', 'clip.webm'])
+    })
+
+    it('toClassicBundle strips module attrs and moves the bundle after body scripts', () => {
+      const b = new HtmlBuilder(vite)
+      b.injectBodyScript('window.plbx_html = {};')
+      b.toClassicBundle()
+      const html = b.toHtml()
+      expect(html).not.toContain('type="module"')
+      expect(html).not.toContain('crossorigin')
+      const bridgeAt = html.indexOf('window.plbx_html = {}')
+      const bundleAt = html.indexOf('window.__bundle=1')
+      expect(bridgeAt).toBeGreaterThan(-1)
+      expect(bundleAt).toBeGreaterThan(bridgeAt)
+      expect(bundleAt).toBeLessThan(html.indexOf('</body>'))
+      // moved, not copied
+      expect(html.split('window.__bundle=1').length).toBe(2)
+    })
+
+    it('toClassicBundle prefers the type="module" script over a longer plain inline script', () => {
+      // A tiny module bundle (the real bundle) alongside a much larger plain
+      // inline script injected afterwards (simulating an adapter-injected
+      // bridge, e.g. the ~4KB MRAID bridge outsizing a small synthetic build).
+      // The length heuristic alone would wrongly pick the bridge; the module
+      // marker must win.
+      const b = new HtmlBuilder(vite)
+      const bigBridge = `window.plbx_html = {}; /* ${'x'.repeat(2000)} */`
+      b.injectBodyScript(bigBridge)
+      expect(bigBridge.length).toBeGreaterThan('(function(){window.__bundle=1})();'.length)
+      b.toClassicBundle()
+      const html = b.toHtml()
+      expect(html).not.toContain('type="module"')
+      const bridgeAt = html.indexOf('window.plbx_html = {}')
+      const bundleAt = html.indexOf('window.__bundle=1')
+      expect(bridgeAt).toBeGreaterThan(-1)
+      // The module script (the bundle) was moved after the larger bridge script.
+      expect(bundleAt).toBeGreaterThan(bridgeAt)
+      expect(bundleAt).toBeLessThan(html.indexOf('</body>'))
+      // The larger plain script stayed exactly where it was injected — NOT moved.
+      expect(html.split('window.plbx_html = {}').length).toBe(2)
+      expect(html.split('window.__bundle=1').length).toBe(2)
+    })
+  })
 })

@@ -51,6 +51,11 @@ const REQUIRED_EXPORTS = [
   'forbiddenStringsFor',
   'NETWORK_FORBIDDEN_STRINGS',
   'FORBIDDEN_STRING_HINTS',
+  // added in 0.3.15 — free-stack single-file path
+  'detectInputKind',
+  'applySingleFileRewrite',
+  'SINGLE_FILE_SPLASH_HOOK_JS',
+  'htmlToPayloadJs',
 ] as const
 
 describe('public API barrel', () => {
@@ -59,4 +64,12 @@ describe('public API barrel', () => {
       expect(kit[name as keyof typeof kit]).toBeDefined()
     })
   }
+})
+
+describe('sdk subpath', () => {
+  it('exports plbx as default and named', async () => {
+    const mod = await import('../src/sdk/index')
+    expect(mod.default).toBe(mod.plbx)
+    expect(typeof mod.plbx.init).toBe('function')
+  })
 })

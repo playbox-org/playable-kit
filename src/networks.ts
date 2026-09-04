@@ -186,6 +186,10 @@ export const NETWORKS: Record<string, NetworkConfig> = {
     mraid: false,
     singleFileZip: true,
     inlineAssets: false,
+    // Liftoff Monetize "Adaptive Creative" upload: "Name your main html file
+    // 'ad.html'". That is the postMessage('download'|'complete') contract our
+    // vungleBridge implements — not the MRAID/index.html path PlayTurbo lists.
+    htmlFileName: 'ad.html',
   },
   mytarget: {
     id: 'mytarget',

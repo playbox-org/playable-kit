@@ -87,7 +87,33 @@ function buildPlbxBridge(downloadBody: string, extras?: string): string {
     ${downloadBody}
   },
   game_end: function() {},
-  game_ready: function() {},
+  // Mintegral/PlayTurbo §4 and Bigo's own gameReady are both CALLED BY THE
+  // CREATIVE (docs/networks/lifecycle-call-direction.md) — on the Cocos path
+  // the runtime loader already calls window.gameReady() itself (it doesn't
+  // wait for game code), but a single-file/free-stack build has no loader,
+  // so nobody ever called it there and Mintegral/Bigo never saw the signal.
+  // window.__plbx_gr is a SHARED flag with the loader's own gameReady call
+  // (src/packager/loader/lifecycle.ts, src/packager/runtime-loader.ts) so a
+  // Cocos build still fires it exactly once, whichever caller gets there
+  // first. If window.gameReady isn't defined yet (validator script injected
+  // late), poll — same bounded 50x100ms pattern as the loader and the MRAID
+  // defer-boot gate — then give up silently; a free-stack build packaged for
+  // a network with no validator at all (most of them) has nothing to poll
+  // for and this is a harmless no-op.
+  game_ready: function() {
+    if (window.__plbx_gr) return;
+    var tries = 0;
+    (function poll() {
+      if (window.__plbx_gr) return;
+      if (typeof window.gameReady === 'function') {
+        window.__plbx_gr = true;
+        try { window.gameReady(); } catch (e) {}
+        return;
+      }
+      tries++;
+      if (tries < 50) setTimeout(poll, 100);
+    })();
+  },
   // §6 on Mintegral (window.gameRetry); nothing to report to elsewhere.
   game_retry: function() {},
   is_audio: function() { return true; },
@@ -106,8 +132,34 @@ function buildPlbxBridge(downloadBody: string, extras?: string): string {
   // Luna reports real mute state through this; elsewhere the container never
   // changes it, so a subscriber gets the current value once and nothing more.
   on_mute_change: function(cb) { if (typeof cb === 'function') { try { cb(this.is_muted()); } catch (e) {} } },
+  // Container signals: paused = not viewable / page hidden / host said so.
+  // Subscribers replay: on_pause fires at once when already paused, on_resize
+  // at once with the current size — same late-subscriber rule as on_*.
+  // set_paused / set_size are called by the adapter's signal script (below the
+  // bridge) and by preview mocks; game code only subscribes.
+  _paused: false,
+  _pause_subs: [],
+  _resume_subs: [],
+  _resize_subs: [],
+  is_paused: function() { return this._paused; },
+  on_pause: function(cb) { if (typeof cb !== 'function') return; this._pause_subs.push(cb); if (this._paused) { try { cb(); } catch (e) {} } },
+  on_resume: function(cb) { if (typeof cb !== 'function') return; this._resume_subs.push(cb); },
+  on_resize: function(cb) { if (typeof cb !== 'function') return; this._resize_subs.push(cb); try { cb(window.innerWidth, window.innerHeight); } catch (e) {} },
+  set_paused: function(p) {
+    p = !!p;
+    if (p === this._paused) return;
+    this._paused = p;
+    var subs = p ? this._pause_subs : this._resume_subs;
+    for (var i = 0; i < subs.length; i++) { try { subs[i](); } catch (e) {} }
+  },
+  set_size: function(w, h) {
+    for (var i = 0; i < this._resize_subs.length; i++) { try { this._resize_subs[i](w, h); } catch (e) {} }
+  },
   report: function() {},
   tap: function() {},
+  // Custom analytics channel. Luna's adapter replaces it with a real sender;
+  // everywhere else a no-op so plbx.log_event() is never a TypeError.
+  log_event: function() {},
   external_commands: [],
   expose: function(name, fn, label) {
     if (typeof name !== 'string' || typeof fn !== 'function') return;
@@ -190,6 +242,35 @@ export function mraidDeferBootGate(): string {
     if (n > 0) setTimeout(function() { poll(n - 1); }, 200);
   })(50);
 };`
+}
+
+/**
+ * Container → bridge signal wiring for pause/resume/resize. Injected right
+ * after the bridge on every network. Page visibility + window resize are the
+ * baseline every container has; MRAID adds its own viewability, state and
+ * size events (Unity's MRAID never fires sizeChange, so the window listener
+ * is what covers it there). Never throws: a stub container missing any of
+ * these is a no-op, not a broken ad.
+ */
+export function lifecycleSignals(mraid: boolean): string {
+  const mraidPart = mraid
+    ? `
+  function attach() {
+    try { mraid.addEventListener('viewableChange', function(v) { b.set_paused(!v); }); } catch(e) {}
+    try { mraid.addEventListener('stateChange', function(s) { if (s === 'hidden') b.set_paused(true); }); } catch(e) {}
+    try { mraid.addEventListener('sizeChange', function(w, h) { b.set_size(w, h); }); } catch(e) {}
+    try { if (typeof mraid.isViewable === 'function' && !mraid.isViewable()) b.set_paused(true); } catch(e) {}
+  }
+  if (window.mraid) {
+    try { (mraid.getState && mraid.getState() === 'loading') ? mraid.addEventListener('ready', attach) : attach(); } catch(e) {}
+  }`
+    : ''
+  return `(function() {
+  var b = window.plbx_html;
+  if (!b || typeof b.set_paused !== 'function') return;
+  try { document.addEventListener('visibilitychange', function() { b.set_paused(document.visibilityState === 'hidden'); }); } catch(e) {}
+  try { window.addEventListener('resize', function() { b.set_size(window.innerWidth, window.innerHeight); }); } catch(e) {}${mraidPart}
+})();`
 }
 
 /** Facebook/Moloco bridge */
@@ -302,6 +383,11 @@ window.open = function(u) {
   if (window.playableSDK && playableSDK.openAppStore) { try { playableSDK.openAppStore(); } catch(e) {} return null; }
   try { return _plbxOrigOpen.apply(window, arguments); } catch(e) { return null; }
 };`,
+      // TikTok/Pangle have NO lifecycle at all (class doc above +
+      // lifecycle-call-direction.md) — the base bridge's game_ready now polls
+      // for and calls window.gameReady, a Mintegral/Bigo-only signal that
+      // does not exist on this SDK. Override back to a no-op.
+      `window.plbx_html.game_ready = function() {};`,
     ].join('\n'),
   )
 }
@@ -564,8 +650,8 @@ function _plbx_luna_audio(muted) {
     for (var j = 0; j < m.length; j++) { m[j].muted = muted; }
   } catch(e) {}
 }
-window.addEventListener('luna:pause', function() { try { if (window.cc && cc.game) cc.game.pause(); } catch(e) {} });
-window.addEventListener('luna:resume', function() { try { if (window.cc && cc.game) cc.game.resume(); } catch(e) {} });
+window.addEventListener('luna:pause', function() { try { if (window.cc && cc.game) cc.game.pause(); } catch(e) {} try { window.plbx_html.set_paused(true); } catch(e) {} });
+window.addEventListener('luna:resume', function() { try { if (window.cc && cc.game) cc.game.resume(); } catch(e) {} try { window.plbx_html.set_paused(false); } catch(e) {} });
 window.addEventListener('luna:mute', function() { _plbx_luna_audio(true); });
 window.addEventListener('luna:unmute', function() { _plbx_luna_audio(false); });`,
   )
@@ -590,9 +676,20 @@ export class BaseAdapter implements NetworkAdapter {
       // Defer Cocos boot until mraid.isViewable() — fixes video+playable combo black screen
       builder.injectBodyScript(mraidDeferBootGate())
     }
-    // Inject SDK URL if specified
+    // Inject SDK URL if specified.
+    // TikTok's spec: "Place the following code at the bottom of body and
+    // before the developer's own JS." Body end it is; the single-file path
+    // moves the game bundle after this, the Cocos loader boots later anyway.
+    // Google is the exception — its exitapi.js stays in <head> as before
+    // (pre-existing placement, kept unchanged). ExitApi does not read the
+    // ad.size/ad.orientation metas GoogleAdapter appends afterwards, so their
+    // relative order in <head> is not spec-constrained.
     if (this.networkConfig.sdkUrl) {
-      builder.injectHeadScript(this.networkConfig.sdkUrl)
+      if (this.networkId === 'google') {
+        builder.injectHeadScript(this.networkConfig.sdkUrl)
+      } else {
+        builder.injectBodyScriptSrc(this.networkConfig.sdkUrl)
+      }
     }
     // Inject SDK inline JS if specified
     if (this.networkConfig.sdkInline) {
@@ -618,6 +715,7 @@ export class BaseAdapter implements NetworkAdapter {
       .filter(Boolean)
       .join('\n')
     builder.injectBodyScript(bridge + (storeSetup ? '\n' + storeSetup : ''))
+    builder.injectBodyScript(lifecycleSignals(this.networkConfig.mraid))
 
     // Inject custom head from config
     if (config.customInjectHead) {

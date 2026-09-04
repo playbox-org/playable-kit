@@ -12,6 +12,40 @@ packager service, the CLI and the extension can share one implementation.
 - `@playbox-ai/playable-kit/networks` — pure network registry data
   (no `fs`/node deps; safe for browser bundles).
 - `@playbox-ai/playable-kit/types` — types only, zero runtime.
+- `@playbox-ai/playable-kit/sdk` — game-side SDK for non-Cocos builds
+  (Vite / Three.js / Pixi). Browser-only, zero deps; also `dist/sdk.iife.js` →
+  `window.plbx` for script-tag use.
+
+## Free-stack builds (Vite / Three.js / Pixi)
+
+Build once, package for every network. The build must be ONE self-contained
+`index.html` (Vite: `vite-plugin-singlefile` + `build.rollupOptions.output.format = 'iife'`).
+
+```ts
+import plbx from '@playbox-ai/playable-kit/sdk'
+
+plbx.set_google_play_url('https://play.google.com/store/apps/details?id=…')
+plbx.set_app_store_url('https://apps.apple.com/app/id…')
+plbx.on('pause', () => game.pause())
+plbx.on('resume', () => game.resume())
+plbx.on('mute', (muted) => sound.setMuted(muted))
+plbx.init(() => new Game())   // boot runs through the network's boot gate
+// after the first frame:   plbx.start()
+// CTA:                     plbx.download()
+// end card:                plbx.game_end()
+```
+
+```
+vite build && npx playable-kit package --build dist --out dist-networks --networks all --name "My Game"
+```
+
+Without a packaged bridge (`vite dev`, a browser tab) the SDK installs a
+preview stub: CTA opens the store URL, pause/resume follow page visibility.
+
+The PLBX loading splash is off by default on both packaging paths. Opt in with
+`--splash` (CLI) or `showSplash: true` (`PackageConfig`); `--splash-logo
+<path>` / `customSplashLogo` swaps in a client logo but only takes effect
+alongside `--splash` / `showSplash: true`.
 
 ## Lifecycle globals — check the direction first
 

@@ -76,18 +76,25 @@ export function scanLoaderHealth(
 
   // virtual_scheme_guarded — the _isVirtualScheme regex must include the
   // optional './' guard, else './chunks:///_virtual/index.js' suffix-collides
-  // with the real boot index.js.
-  const vs = blockAfter(html, '_isVirtualScheme')
+  // with the real boot index.js. This guard only exists inside the runtime
+  // loader (self-contained `__plbx_zip` or legacy systemjs `__zip`); a
+  // single-file artifact carries no runtime loader at all, so there is
+  // nothing to guard and the check trivially passes.
+  const hasRuntimeLoader =
+    html.includes('__plbx_zip') || html.includes('window.__zip')
+  const vs = hasRuntimeLoader ? blockAfter(html, '_isVirtualScheme') : null
   const guarded = !!vs && vs.includes('(\\.\\/)?')
   checks.push({
     id: 'virtual_scheme_guarded',
-    pass: guarded,
+    pass: !hasRuntimeLoader || guarded,
     severity: 'fail',
-    detail: !vs
-      ? 'No _isVirtualScheme found — repackage with the current extension.'
-      : guarded
-        ? "_isVirtualScheme guards the './'-prefixed probe."
-        : "_isVirtualScheme lacks the (\\./)? guard — './chunks:///_virtual/index.js' collides with boot index.js → grey screen. Repackage with the current extension.",
+    detail: !hasRuntimeLoader
+      ? 'No runtime loader (single-file build) — nothing to guard.'
+      : !vs
+        ? 'No _isVirtualScheme found — repackage with the current extension.'
+        : guarded
+          ? "_isVirtualScheme guards the './'-prefixed probe."
+          : "_isVirtualScheme lacks the (\\./)? guard — './chunks:///_virtual/index.js' collides with boot index.js → grey screen. Repackage with the current extension.",
   })
 
   // loader_version — banner version must be at/above the boot-safety floor.

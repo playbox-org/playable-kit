@@ -48,7 +48,7 @@ describe('scanLoaderHealth', () => {
       'window.__plbx_pre_boot = function(boot){ var w=window.innerWidth; document.visibilityState; (function poll(n){ setTimeout(function(){poll(n-1)},200); })(50); };'
     const buggyVs =
       'function _isVirtualScheme(url){ return /^(chunks|virtual|blob|data|about):/.test(url); }'
-    const html = `<script>${robustGate}</script><script>${buggyVs}</script><script>console.log("v0.2.21")</script>`
+    const html = `<script>${robustGate}</script><script>${buggyVs}</script><script>window.__plbx_zip = "x";</script><script>console.log("v0.2.21")</script>`
     const checks = scanLoaderHealth(html, { mraid: true })
     expect(byId(checks, 'gate_robust')?.pass).toBe(true)
     expect(byId(checks, 'virtual_scheme_guarded')?.pass).toBe(false)
@@ -71,5 +71,27 @@ describe('scanLoaderHealth', () => {
     expect(
       byId(scanLoaderHealth(below, { mraid: false }), 'loader_version')?.pass,
     ).toBe(false)
+  })
+
+  it('passes virtual_scheme_guarded on a single-file build (no runtime loader — nothing to guard)', () => {
+    const html =
+      '<script>window.__plbx_pre_boot = function(boot){ var w=window.innerWidth; document.visibilityState; (function poll(n){ setTimeout(function(){poll(n-1)},200); })(50); };</script><script>console.log("v0.3.14")</script>'
+    const checks = scanLoaderHealth(html, { mraid: false })
+    const vs = byId(checks, 'virtual_scheme_guarded')
+    expect(vs?.pass).toBe(true)
+    expect(vs?.detail).toBe(
+      'No runtime loader (single-file build) — nothing to guard.',
+    )
+  })
+
+  it('still fails virtual_scheme_guarded on a loader build missing the guard (regression net)', () => {
+    const html =
+      '<script>window.__plbx_zip = "x";</script><script>console.log("v0.3.14")</script>'
+    const checks = scanLoaderHealth(html, { mraid: false })
+    const vs = byId(checks, 'virtual_scheme_guarded')
+    expect(vs?.pass).toBe(false)
+    expect(vs?.detail).toBe(
+      'No _isVirtualScheme found — repackage with the current extension.',
+    )
   })
 })

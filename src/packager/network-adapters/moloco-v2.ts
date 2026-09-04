@@ -125,7 +125,34 @@ window.plbx_html.on_mute_change = function(cb) {
   // Sync the new subscriber to the current state immediately.
   try { cb(_muted); } catch(e) {}
 };
+// Same container-signal surface buildPlbxBridge gives every other network
+// (is_paused/on_pause/on_resume/on_resize/set_paused/set_size) — this bridge
+// is assembled piecewise, so it is replicated here instead of shared. The
+// base adapter's lifecycleSignals() script (injected right after this bridge
+// by BaseAdapter.transform) wires MRAID viewability/size into set_paused/
+// set_size the same way it does for every MRAID network.
+var _paused = false;
+var _pauseSubs = [];
+var _resumeSubs = [];
+var _resizeSubs = [];
+window.plbx_html.is_paused = function() { return _paused; };
+window.plbx_html.on_pause = function(cb) { if (typeof cb !== 'function') return; _pauseSubs.push(cb); if (_paused) { try { cb(); } catch(e) {} } };
+window.plbx_html.on_resume = function(cb) { if (typeof cb !== 'function') return; _resumeSubs.push(cb); };
+window.plbx_html.on_resize = function(cb) { if (typeof cb !== 'function') return; _resizeSubs.push(cb); try { cb(window.innerWidth, window.innerHeight); } catch(e) {} };
+window.plbx_html.set_paused = function(p) {
+  p = !!p;
+  if (p === _paused) return;
+  _paused = p;
+  var subs = p ? _pauseSubs : _resumeSubs;
+  for (var i = 0; i < subs.length; i++) { try { subs[i](); } catch(e) {} }
+};
+window.plbx_html.set_size = function(w, h) {
+  for (var i = 0; i < _resizeSubs.length; i++) { try { _resizeSubs[i](w, h); } catch(e) {} }
+};
 window.plbx_html.report = function(k) { fire(k); };
+// Custom analytics channel — no Moloco-side sink, so a no-op like every
+// non-Luna network (see buildPlbxBridge in base.ts).
+window.plbx_html.log_event = function() {};
 window.plbx_html.tap = function() {
   taps++;
   var te = macroInt('taps_for_engagement', ${MOLOCO_V2_DEFAULT_TAP_ENGAGEMENT});

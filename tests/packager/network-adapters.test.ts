@@ -753,6 +753,27 @@ describe('Network Adapters', () => {
         expect(html, `Vungle HTML leaked "${needle}"`).not.toContain(needle)
       }
     })
+
+    it('injects a globalThis shim before every other script (old WebView predates globalThis)', () => {
+      const adapter = getAdapter('vungle')
+      const builder = new HtmlBuilder(sampleHtml)
+      adapter.transform(builder, defaultConfig)
+      const html = builder.toHtml()
+      const shim = 'window.globalThis=window.globalThis||window;'
+      const shimAt = html.indexOf(shim)
+      const bridgeAt = html.indexOf('window.plbx_html = window.plbx_html ||')
+      expect(shimAt).toBeGreaterThan(-1)
+      expect(bridgeAt).toBeGreaterThan(-1)
+      expect(shimAt).toBeLessThan(bridgeAt)
+    })
+
+    it('a non-Vungle network does not carry the globalThis shim', () => {
+      const adapter = getAdapter('facebook')
+      const builder = new HtmlBuilder(sampleHtml)
+      adapter.transform(builder, defaultConfig)
+      const html = builder.toHtml()
+      expect(html).not.toContain('window.globalThis=window.globalThis||window;')
+    })
   })
 
   describe('Non-MRAID networks without SDK', () => {
@@ -763,6 +784,34 @@ describe('Network Adapters', () => {
         adapter.transform(builder, defaultConfig)
         expect(builder.toHtml()).not.toContain('mraid.js')
       })
+    })
+  })
+
+  describe('network SDK tag position', () => {
+    const html = '<!DOCTYPE html><html><head></head><body><canvas></canvas></body></html>'
+    const config = { orientation: 'portrait' as const }
+
+    for (const id of ['tiktok', 'pangle', 'bigo', 'gdt']) {
+      it(`${id}: the SDK script sits at the end of body, BEFORE the bridge`, () => {
+        const b = new HtmlBuilder(html)
+        getAdapter(id).transform(b, config)
+        const out = b.toHtml()
+        const sdkAt = out.indexOf('<script src="https://')
+        const bridgeAt = out.indexOf('window.plbx_html = window.plbx_html ||')
+        const lifecycleAt = out.indexOf('visibilitychange')
+        expect(sdkAt).toBeGreaterThan(out.indexOf('<canvas'))
+        expect(sdkAt).toBeLessThan(out.indexOf('</body>'))
+        expect(out.indexOf('</head>')).toBeLessThan(sdkAt)
+        expect(sdkAt).toBeLessThan(bridgeAt)
+        expect(sdkAt).toBeLessThan(lifecycleAt)
+      })
+    }
+
+    it('google keeps exitapi.js in head', () => {
+      const b = new HtmlBuilder(html)
+      getAdapter('google').transform(b, config)
+      const out = b.toHtml()
+      expect(out.indexOf('exitapi.js')).toBeLessThan(out.indexOf('</head>'))
     })
   })
 })

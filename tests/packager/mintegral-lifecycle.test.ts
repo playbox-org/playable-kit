@@ -22,8 +22,18 @@ const sampleHtml =
 
 type FakeWindow = Record<string, unknown>
 
-/** Run the adapter's injected scripts against a fresh fake window. */
-function bootCreative(): FakeWindow {
+/**
+ * Run the adapter's injected scripts against a fresh fake window.
+ *
+ * `timers`, when passed, captures every `setTimeout(cb, ms)` callback
+ * scheduled during boot (and by anything called later against the returned
+ * window) instead of letting a real timer fire — tests that need to advance
+ * a poll (game_ready's bounded retry) shift a callback off this array and
+ * call it themselves. Without it, `setTimeout` is a no-op stub (matches the
+ * historical behaviour of every other test in this file, none of which care
+ * about timing).
+ */
+function bootCreative(timers?: Array<() => void>): FakeWindow {
   const builder = new HtmlBuilder(sampleHtml)
   getAdapter('mintegral').transform(builder, config)
   const html = builder.toHtml()
@@ -37,13 +47,20 @@ function bootCreative(): FakeWindow {
     open: () => null,
     console: { log: () => {} },
   }
+  const fakeSetTimeout = (cb: () => void) => {
+    if (timers) timers.push(cb)
+    return 0
+  }
   for (const code of scripts) {
     // The banner script uses console styling and nothing else we care about;
     // anything that throws in this stub environment is not part of the contract.
     try {
-      new Function('window', 'parent', 'document', code)(win, win, {
-        querySelectorAll: () => [],
-      })
+      new Function('window', 'parent', 'document', 'setTimeout', code)(
+        win,
+        win,
+        { querySelectorAll: () => [] },
+        fakeSetTimeout,
+      )
     } catch {
       /* not under test */
     }
@@ -151,5 +168,31 @@ describe('Mintegral lifecycle direction', () => {
     ;(win.gameStart as () => void)()
     expect(own).toBe(1)
     expect(subbed).toBe(1)
+  })
+
+  // §4: gameReady() is CALLED BY THE CREATIVE — a free-stack single-file
+  // build has no runtime loader to fire it, so plbx_html.game_ready() is the
+  // only thing that ever does. See docs/networks/lifecycle-call-direction.md.
+  it('game_ready calls window.gameReady when it is already defined, once', () => {
+    const win = bootCreative()
+    let calls = 0
+    win.gameReady = () => { calls++ }
+    plbx(win).game_ready()
+    plbx(win).game_ready()
+    expect(calls).toBe(1)
+    expect(win.__plbx_gr).toBe(true)
+  })
+
+  it('game_ready polls when window.gameReady is not defined yet', () => {
+    const timers: Array<() => void> = []
+    const win = bootCreative(timers)
+    let calls = 0
+    plbx(win).game_ready() // window.gameReady not defined yet — schedules a poll
+    expect(calls).toBe(0)
+    expect(timers.length).toBeGreaterThan(0)
+    win.gameReady = () => { calls++ }
+    timers.shift()!() // advance the fake setTimeout — the poll runs again
+    expect(calls).toBe(1)
+    expect(win.__plbx_gr).toBe(true)
   })
 })

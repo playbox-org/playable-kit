@@ -217,6 +217,22 @@ export const FIRST_FRAME_HOOK_JS =
   '})();'
 
 /**
+ * Splash hide hook for the single-file path. No Cocos director to watch:
+ * the game itself says when the first frame is up by calling
+ * plbx_html.game_ready() (SDK: plbx.start()). Wraps whatever game_ready the
+ * adapter installed so the network still hears it. 8s ceiling as a net.
+ */
+export const SINGLE_FILE_SPLASH_HOOK_JS =
+  '(function(){var done=false;' +
+  'function hide(){if(done)return;done=true;' +
+  'try{window.__plbx_splash_hide&&window.__plbx_splash_hide()}catch(e){}}' +
+  'var b=window.plbx_html;' +
+  'if(b){var gr=b.game_ready;b.game_ready=function(){' +
+  'try{if(typeof gr==="function")gr.apply(b,arguments)}catch(e){}hide()}}' +
+  'setTimeout(hide,8000);' +
+  '})();'
+
+/**
  * Raw (uncompressed) bytes the splash adds to an HTML build — style + body +
  * hideJs + first-frame hook + wrapper tags. Honest maximum; gzip on the
  * CDN/ad-network shrinks it further. Static markup → effectively constant.

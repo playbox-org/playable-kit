@@ -891,6 +891,58 @@ export function generatePreviewUtil(params: PreviewUtilParams): string {
   report('preview_loaded', { networkId: '${networkId}' });
 `)
 
+  // Phase 6: plbx_html call tracking — every network.
+  //
+  // window.plbx_html does not exist yet when this util runs: it is defined by
+  // a body <script> the packager's network adapter injects AFTER <head>
+  // (buildPlbxBridge in network-adapters/base.ts), and some adapters then
+  // reassign individual members synchronously in that same script (Vungle's
+  // game_end, Luna's log_event, ...). So we poll for the bridge instead of
+  // grabbing it now, and by the time a poll tick sees window.plbx_html its
+  // members are already final.
+  //
+  // Wraps tap/game_ready/game_end/game_retry/download/report/log_event/expose
+  // (whichever are present) so every call the game makes on the bridge is
+  // reported as a 'plbx_call' event — { method, n (per-method call count),
+  // arg (the first argument, only when it is a string, e.g. expose's command
+  // name) } — for preview UIs to show a tap-count / call column on ANY
+  // network, not just the ones with their own SDK mock above. A throwing
+  // original is reported first, then rethrown, so the game's own error
+  // handling still sees it.
+  parts.push(`
+  /* PLBX_CALL_TRACKING */
+  var _plbxCallCounts = {};
+  function _plbxWrapBridge() {
+    try {
+      var b = window.plbx_html;
+      if (!b || typeof b !== 'object' || b.__plbx_preview_wrapped) return false;
+      var _plbxBridgeMethods = ['tap', 'game_ready', 'game_end', 'game_retry', 'download', 'report', 'log_event', 'expose'];
+      for (var _plbxI = 0; _plbxI < _plbxBridgeMethods.length; _plbxI++) {
+        (function(name) {
+          var orig = b[name];
+          if (typeof orig !== 'function') return;
+          b[name] = function() {
+            _plbxCallCounts[name] = (_plbxCallCounts[name] || 0) + 1;
+            try {
+              var firstArg = (arguments.length > 0 && typeof arguments[0] === 'string') ? arguments[0] : undefined;
+              report('plbx_call', { method: name, n: _plbxCallCounts[name], arg: firstArg });
+            } catch(e) {}
+            return orig.apply(this, arguments);
+          };
+        })(_plbxBridgeMethods[_plbxI]);
+      }
+      b.__plbx_preview_wrapped = true;
+      return true;
+    } catch(e) { return false; }
+  }
+  var _plbxWrapTries = 0;
+  (function _plbxPollBridge() {
+    if (_plbxWrapBridge()) return;
+    _plbxWrapTries++;
+    if (_plbxWrapTries < 200) setTimeout(_plbxPollBridge, 50);
+  })();
+`)
+
   parts.push(`
 })();
 `)

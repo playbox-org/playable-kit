@@ -637,3 +637,185 @@ describe('Luna custom-event value check (runs the generated code)', () => {
     expect(standard.every((m) => m.data.valueOk)).toBe(true)
   })
 })
+
+// ---------------------------------------------------------------------------
+// The mock never sees window.plbx_html — it is defined later by a body
+// <script> the packager's network adapter injects (buildPlbxBridge in
+// network-adapters/base.ts). So the phase that wraps its members has to poll
+// for the bridge instead of finding it at util-run time. This harness gives
+// full manual control over the timer queue: setTimeout just pushes the
+// callback, and tick() drains whatever is queued right now — mirroring "one
+// poll tick" for real, not by faking time.
+// ---------------------------------------------------------------------------
+function runPlbxCallHarness(networkId = 'mintegral', mraid = false) {
+  const pending: Array<() => void> = []
+  const posted: any[] = []
+
+  const sandbox: any = {
+    console,
+    URL,
+    setTimeout: (fn: () => void) => {
+      pending.push(fn)
+      return pending.length
+    },
+    clearTimeout: () => {},
+    setInterval: () => 0,
+    clearInterval: () => {},
+    location: { hostname: 'localhost', href: 'http://localhost/' },
+    parent: { postMessage: (msg: any) => posted.push(msg) },
+    document: {
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      querySelector: () => null,
+      querySelectorAll: () => [],
+    },
+    XMLHttpRequest: function () {} as any,
+    HTMLImageElement: function () {} as any,
+  }
+  sandbox.XMLHttpRequest.prototype.open = function () {}
+  sandbox.window = sandbox
+  sandbox.self = sandbox
+  sandbox.addEventListener = () => {}
+  sandbox.removeEventListener = () => {}
+
+  vm.createContext(sandbox)
+  vm.runInContext(
+    generatePreviewUtil({ networkId, mraid, maxSize: 5 * 1024 * 1024 }),
+    sandbox,
+  )
+
+  const tick = () => {
+    const due = pending.splice(0, pending.length)
+    due.forEach((fn) => fn())
+  }
+  const seen = () => posted.filter((m) => m && m.type === 'plbx:preview')
+  return {
+    win: sandbox,
+    tick,
+    pendingCount: () => pending.length,
+    reports: (event: string) => seen().filter((m) => m.event === event),
+  }
+}
+
+describe('plbx_html call tracking', () => {
+  it('reports nothing before the bridge exists', () => {
+    const h = runPlbxCallHarness()
+    h.tick()
+    expect(h.reports('plbx_call')).toHaveLength(0)
+  })
+
+  it('wraps the bridge members on the first poll tick that sees them, and counts calls', () => {
+    const h = runPlbxCallHarness()
+    const tap = vi.fn()
+    const gameReady = vi.fn()
+    const download = vi.fn()
+    const expose = vi.fn()
+    h.win.plbx_html = { tap, game_ready: gameReady, download, expose }
+
+    h.tick() // the poll callback queued at util-run time sees the bridge now
+
+    expect(h.win.plbx_html.__plbx_preview_wrapped).toBe(true)
+
+    let receiver: any
+    h.win.plbx_html.tap.call((receiver = { self: true }))
+    h.win.plbx_html.tap()
+    h.win.plbx_html.tap()
+
+    const calls = h.reports('plbx_call').filter((m) => m.data.method === 'tap')
+    expect(calls.map((m) => m.data.n)).toEqual([1, 2, 3])
+    expect(tap).toHaveBeenCalledTimes(3)
+    expect(tap.mock.instances[0]).toBe(receiver)
+  })
+
+  it("reports expose('restart', fn, 'Restart') and still calls through with all arguments", () => {
+    const h = runPlbxCallHarness()
+    const original = vi.fn()
+    h.win.plbx_html = { expose: original }
+    h.tick()
+
+    const restartFn = () => {}
+    h.win.plbx_html.expose('restart', restartFn, 'Restart')
+
+    const calls = h.reports('plbx_call').filter((m) => m.data.method === 'expose')
+    expect(calls).toHaveLength(1)
+    expect(calls[0].data).toMatchObject({ method: 'expose', n: 1, arg: 'restart' })
+    expect(original).toHaveBeenCalledWith('restart', restartFn, 'Restart')
+  })
+
+  it('wrapping twice does not double-count subsequent calls', () => {
+    const h = runPlbxCallHarness()
+    const tap = vi.fn()
+    h.win.plbx_html = { tap }
+    h.tick()
+    expect(h.win.plbx_html.__plbx_preview_wrapped).toBe(true)
+
+    // Nothing left scheduled once the bridge is wrapped — draining again is a
+    // no-op, proving the poll doesn't keep re-wrapping forever.
+    h.tick()
+
+    h.win.plbx_html.tap()
+    const calls = h.reports('plbx_call').filter((m) => m.data.method === 'tap')
+    expect(calls).toHaveLength(1)
+    expect(calls[0].data.n).toBe(1)
+    expect(tap).toHaveBeenCalledTimes(1)
+  })
+
+  it('skips a member missing from the bridge without error', () => {
+    const h = runPlbxCallHarness()
+    h.win.plbx_html = { tap: vi.fn() } // no game_end, no download, ...
+    expect(() => h.tick()).not.toThrow()
+    expect(h.win.plbx_html.__plbx_preview_wrapped).toBe(true)
+    expect(h.win.plbx_html.game_end).toBeUndefined()
+  })
+
+  it('reports a throwing original call, then rethrows it (the game keeps seeing the error)', () => {
+    const h = runPlbxCallHarness()
+    const boom = new Error('boom')
+    h.win.plbx_html = {
+      tap: () => {
+        throw boom
+      },
+    }
+    h.tick()
+
+    expect(() => h.win.plbx_html.tap()).toThrow(boom)
+    const calls = h.reports('plbx_call').filter((m) => m.data.method === 'tap')
+    expect(calls).toHaveLength(1) // reported BEFORE the rethrow
+  })
+
+  it('polls up to 200 times at 50ms before giving up if the bridge never appears', () => {
+    const h = runPlbxCallHarness()
+    for (let i = 0; i < 199; i++) {
+      expect(h.pendingCount()).toBeGreaterThan(0)
+      h.tick()
+    }
+    // still no bridge; the 200th tick must not schedule a 201st
+    h.tick()
+    expect(h.pendingCount()).toBe(0)
+  })
+
+  it('is generated for every network, not gated behind mraid', () => {
+    const nonMraid = generatePreviewUtil({ networkId: 'mintegral', mraid: false, maxSize: 1 })
+    const mraidNet = generatePreviewUtil({ networkId: 'applovin', mraid: true, maxSize: 1 })
+    for (const code of [nonMraid, mraidNet]) {
+      expect(code).toContain('_plbxCallCounts')
+      expect(code).toContain('__plbx_preview_wrapped')
+    }
+  })
+
+  it('uses only ES5 syntax in the call-tracking phase (no let/const/arrow functions)', () => {
+    const code = generatePreviewUtil({ networkId: 'mintegral', mraid: false, maxSize: 1 })
+    const marker = '/* PLBX_CALL_TRACKING */'
+    const idx = code.indexOf(marker)
+    expect(idx).toBeGreaterThan(-1)
+    const phase = code.slice(idx)
+    expect(phase).not.toMatch(/\blet\s/)
+    expect(phase).not.toMatch(/\bconst\s/)
+    expect(phase).not.toMatch(/=>/)
+  })
+
+  it('emits parseable JavaScript for a network with the MRAID SDK mock too', () => {
+    const code = generatePreviewUtil({ networkId: 'applovin', mraid: true, maxSize: 1 })
+    expect(() => new Function(code)).not.toThrow()
+  })
+})

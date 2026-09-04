@@ -25,7 +25,7 @@ const REQUIRED_EXPORTS = [
   // added in 0.3.5 — consumed by plbx-cocos-extension (preview validator's
   // static no_forbidden_literals check)
   'findForbiddenLiterals',
-  // added in 0.3.16 — the ZIP root-file contract (Tencent config.json, Luna
+  // added in 0.3.17 — the ZIP root-file contract (Tencent config.json, Luna
   // manifests) shared by validateArtifact, the extension preview and the
   // platform validator
   'zipRootFilesVerdict',

@@ -16,6 +16,7 @@ export const CTA_LABELS: Record<string, string> = {
   mytarget: 'CTA (MTRG.onCTAClick)',
   yandex: 'CTA (yandexHTML5BannerApi)',
   luna: 'CTA (Luna.Unity.Playable.InstallFullGame)',
+  gdt: 'CTA (_gdtUnSdk.playAble.onClick)',
 }
 
 // Networks requiring full gameReady/gameStart/gameEnd/gameClose lifecycle
@@ -242,6 +243,7 @@ export function getNetworkChecks(
     yandex:
       'Call yandexHTML5BannerApi.getClickURLNum(1) when the user taps the CTA button.',
     luna: "Call Luna.Unity.Playable.InstallFullGame() when the user taps the CTA button — Luna's standard Ad Click fires from there and nowhere else. plbx_html.download() and window.install() already route into it.",
+    gdt: 'Call window._gdtUnSdk.playAble.onClick() (capital A) when the user taps the CTA button — the Tencent SDK performs the store jump and tracks the click; a window.open() of your own is untracked and counts as a forbidden JS redirect. plbx_html.download() and window.install() already route into it.',
   }
   checks.push({
     id: 'cta',
@@ -288,6 +290,18 @@ export function getNetworkChecks(
       id: 'game_close',
       label: 'gameClose()',
       hint: 'Call window.gameClose() when the playable ad is being closed. Typically called after CTA or at the end of the experience.',
+    })
+  }
+
+  // Root-file contract of ZIP networks (Tencent config.json, Luna manifests).
+  // The verdict comes from the kit's zipRootFilesVerdict over the archive
+  // listing — the def exists only when the network declares files.
+  const rootFiles = getNetwork(networkId)?.zipRootFiles
+  if (rootFiles && rootFiles.length) {
+    checks.push({
+      id: 'zip_root_files',
+      label: `Archive root has ${rootFiles.join(' + ')}`,
+      hint: `${getNetwork(networkId)?.name} reads ${rootFiles.join(' and ')} from the archive root; the packager writes them — a wrapping folder or a hand-edited archive loses them.`,
     })
   }
 

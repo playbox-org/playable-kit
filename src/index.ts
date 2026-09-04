@@ -84,6 +84,8 @@ export {
   MIN_SAFE_LOADER_VERSION,
   scanLoaderHealth,
 } from './validation/loader-health'
+export { zipRootFilesVerdict } from './validation/zip-root-files'
+export type { ZipRootFilesVerdict } from './validation/zip-root-files'
 export type { LoaderCheck } from './validation/loader-health'
 export {
   CTA_LABELS,

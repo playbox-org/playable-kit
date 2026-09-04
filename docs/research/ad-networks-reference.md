@@ -245,6 +245,7 @@ Two official channels (do not conflate — this was a bug in the old doc):
 - **Best available (third-party only):** [Playturbo](https://doc.playturbo.com/export-and-deployment/playable-upload-specifications-for-networks.md) lists **5 MB** for Kwai, but its **File Format column is BLANK** — ZIP is NOT confirmed. CTA / MRAID / SDK / lifecycle all UNKNOWN. Keep 5 MB tentative; flag format+CTA+MRAID as unverified; obtain the real spec from a Kwai/Kuaishou account manager.
 
 ### GDT (Tencent Guangdiantong / 优量汇) — `high`
+- **Full spec + packager gap analysis:** `docs/networks/tencent-gdt-playable.md` (2026-09-04).
 - **CTA:** `window._gdtUnSdk.playAble.onClick()` (exact casing `playAble`) — developer reports the click, SDK performs the store jump. First instantiate `window._gdtUnSdk = new window.GDTUnSdk({ type: 'playable', onSuccess, onError })`. Guard: `window._gdtUnSdk && ...`. — [优量汇 playable doc](https://developers.adnet.qq.com/doc/web/tryable)
 - **Size:** **ZIP ≤ 3 MB** (`包大小：不大于3M`). Always a ZIP. — same source + [PlayTurbo confirmation](https://doc.playturbo.cn/su-cai-dao-chu-tou-fang-xiang-guan-wen-dang/ke-wan-guang-gao-qu-dao-shang-chuan-gui-fan)
 - **SDK:** `https://qzs.gdtimg.com/union/res/union_sdk/page/unjs/unsdk.js` — in `<head>`, https only, no `crossorigin`.

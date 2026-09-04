@@ -9,6 +9,7 @@ import { SnapchatAdapter } from './snapchat'
 import { VungleAdapter } from './vungle'
 import { MolocoV2Adapter } from './moloco-v2'
 import { LunaAdapter } from './luna'
+import { GdtAdapter } from './gdt'
 import { getNetwork } from '../../networks'
 import { NetworkConfig } from '../../types'
 
@@ -29,6 +30,7 @@ const CUSTOM_ADAPTERS: Record<string, AdapterConstructor> = {
   snapchat: SnapchatAdapter,
   vungle: VungleAdapter,
   luna: LunaAdapter,
+  gdt: GdtAdapter,
 }
 
 export function getAdapter(networkId: string): NetworkAdapter {

@@ -32,6 +32,8 @@ function expectedCtaMethod(networkId: string, mraid: boolean): string {
     // Luna's standard Ad Click fires only from Luna.Unity.Playable.InstallFullGame()
     // — a bare window.open() must read as an incorrect CTA, not a success.
     luna: 'luna_install',
+    // Tencent 优量汇 tracks the click only via _gdtUnSdk.playAble.onClick().
+    gdt: 'gdt_onclick',
   }
   return MAP[networkId] || (mraid ? 'mraid.open' : 'window.open')
 }
@@ -828,6 +830,59 @@ export function generatePreviewUtil(params: PreviewUtilParams): string {
       } catch(err) { console.warn('[plbx] Audio mute error:', err); }
     }
   });
+`)
+  }
+
+  if (networkId === 'gdt') {
+    parts.push(`
+  // Tencent 优量汇 GDTUnSdk — WRAP the real constructor, don't replace it (same
+  // rule as the TikTok mock): the build's external unsdk.js loads normally; we
+  // decorate each instance's playAble.onClick so the checklist sees the CTA,
+  // then delegate to the real method. An accessor trap on window.GDTUnSdk
+  // (installed before the head <script> runs) catches the SDK's assignment.
+  // If the SDK never arrives (offline / CDN blocked) a mock constructor keeps
+  // preview working; the bridge instantiates lazily on the first CTA, so the
+  // late mock is still picked up.
+  (function() {
+    function beacon(inst, opts) {
+      var pa = inst && inst.playAble;
+      if (!pa) return inst;                              // real SDK without playAble → leave it, the CTA falls to window.open and reads incorrect
+      if (pa.onClick && pa.onClick.__plbxBeacon) return inst;
+      var orig = typeof pa.onClick === 'function' ? pa.onClick.bind(pa) : null;
+      var wrapped = function() {
+        report('cta', { method: 'gdt_onclick' });
+        if (orig) { try { return orig.apply(null, arguments); } catch(e) {} }
+        else if (opts && typeof opts.onSuccess === 'function') { try { opts.onSuccess({ preview: true }); } catch(e) {} }
+      };
+      wrapped.__plbxBeacon = true;
+      pa.onClick = wrapped;
+      return inst;
+    }
+    function decorate(Ctor) {
+      if (typeof Ctor !== 'function' || Ctor.__plbxBeacon) return Ctor;
+      var Wrapped = function(opts) { return beacon(new Ctor(opts), opts); };
+      Wrapped.__plbxBeacon = true;
+      return Wrapped;
+    }
+    function mock() {
+      var M = function(opts) { return beacon({ playAble: {} }, opts); };
+      M.__plbxBeacon = true;
+      return M;
+    }
+    var backing;
+    Object.defineProperty(window, 'GDTUnSdk', {
+      configurable: true,
+      get: function() { return backing; },
+      set: function(v) { backing = decorate(v); }
+    });
+    var tries = 0;
+    var iv = setInterval(function() {
+      if (backing || ++tries >= 30) {         // ~3s at 100ms
+        clearInterval(iv);
+        if (!backing) backing = mock();       // no real SDK arrived → offline fallback
+      }
+    }, 100);
+  })();
 `)
   }
 

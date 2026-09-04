@@ -45,6 +45,12 @@ export interface NetworkConfig {
    *  where that has been observed, not where it is suspected. Previews serve the
    *  artifact under `STRICT_CSP` by default for these. See preview/csp.ts. */
   strictCsp?: boolean
+  /** Files that must sit at the archive ROOT beside the HTML (Tencent's
+   *  `config.json`, Luna's `luna.json` + `playground.json`). The packager
+   *  writes them; every validator (kit `validateArtifact`, extension preview,
+   *  platform web validator) fails the build through `zipRootFilesVerdict`
+   *  when one is missing or wrapped in a folder — one rule, three surfaces. */
+  zipRootFiles?: string[]
 }
 
 export interface PackageConfig {

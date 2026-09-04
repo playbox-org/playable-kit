@@ -1,6 +1,7 @@
 import { getAdapter } from '../packager/network-adapters'
 import { validateLauncher } from '../packager/launcher-builder'
 import { getNetwork, FORBIDDEN_STRING_HINTS } from '../networks'
+import { zipRootFilesVerdict } from './zip-root-files'
 import type { ArtifactFileKind, CheckResult } from '../types'
 import { extractAxonUsage, validateAxonEvents } from './axon-events'
 import { extractLunaUsage, validateLunaEvents } from './luna-events'
@@ -49,6 +50,12 @@ export interface ValidateArtifactInput {
    * artifacts omits it and those checks are skipped.
    */
   buildDir?: string
+  /**
+   * Archive entry paths of a zip artifact. Enables the `zip-root-files` check
+   * for networks that declare `NetworkConfig.zipRootFiles`; omitted → skipped
+   * (an html artifact, or a caller that only has the inner HTML).
+   */
+  zipEntries?: string[]
 }
 
 function formatBytes(n: number): string {
@@ -107,6 +114,18 @@ export function validateArtifact(input: ValidateArtifactInput): CheckResult[] {
           ? `${formatBytes(file.sizeBytes)} (no limit)`
           : `${formatBytes(file.sizeBytes)} of ${formatBytes(limit)}`,
     })
+  }
+
+  if (input.zipEntries) {
+    const verdict = zipRootFilesVerdict(input.networkId, input.zipEntries)
+    if (verdict) {
+      checks.push({
+        id: 'zip-root-files',
+        label: `Archive root has ${verdict.required.join(' + ')}`,
+        status: verdict.missing.length ? 'failed' : 'passed',
+        details: verdict.details,
+      })
+    }
   }
 
   if (html !== null) {

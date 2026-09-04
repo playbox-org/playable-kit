@@ -227,12 +227,27 @@ describe('generatePreviewUtil', () => {
 
   it('should wrap window.open as generic CTA fallback', () => {
     const code = generatePreviewUtil({
-      networkId: 'gdt',
+      networkId: 'kwai',
       mraid: false,
       maxSize: 5242880,
     })
     expect(code).toContain('window.open')
     expect(code).toContain("report('cta'")
+  })
+
+  // Tencent 优量汇: the click is tracked only through _gdtUnSdk.playAble.onClick().
+  // A bare window.open() must read as an incorrect CTA, and the mock must wrap
+  // the real GDTUnSdk constructor rather than replace it.
+  it('wraps GDTUnSdk for gdt and expects gdt_onclick as the CTA', () => {
+    const code = generatePreviewUtil({
+      networkId: 'gdt',
+      mraid: false,
+      maxSize: 3 * 1024 * 1024,
+    })
+    expect(code).toContain('var _plbxExpectedCta = "gdt_onclick"')
+    expect(code).toContain("Object.defineProperty(window, 'GDTUnSdk'")
+    expect(code).toContain("report('cta', { method: 'gdt_onclick' })")
+    expect(code).toContain('pa.onClick = wrapped')
   })
 })
 

@@ -78,7 +78,7 @@ export interface NetworkAdapter {
  * the event has already happened, so game code never has to care whether it
  * registered before or after. Cocos boots asynchronously, so it usually did not.
  */
-function buildPlbxBridge(downloadBody: string, extras?: string): string {
+export function buildPlbxBridge(downloadBody: string, extras?: string): string {
   return `window.plbx_html = window.plbx_html || {
   google_play_url: "",
   appstore_url: "",

@@ -19,6 +19,7 @@ symptom is a hook that never runs — or one that runs at the wrong moment.
 | **Luna / Unity Playworks** | `Luna.Unity.Playable.InstallFullGame()` | `startGame()` | Its own contract, and `startGame` additionally **gates boot** — the creative must not self-start. Not the same thing as Mintegral's `gameStart` despite the transposed name — see the next section. |
 | **MRAID networks** (AppLovin, Unity Ads, ironSource, …) | `mraid.open()` | `viewableChange` listener | Not `game*` at all; the defer-boot gate is `__plbx_pre_boot`. |
 | **Vungle** | `parent.postMessage('download'\|'complete')` | — | No globals; `download` and `complete` must never fire together. |
+| **Tencent Ads / 优量汇 (gdt)** | `_gdtUnSdk.playAble.onClick()` after `new GDTUnSdk({ type: 'playable' })` — and nothing else | — | **No lifecycle exists.** Click only; the SDK does the store jump. `TencentGDT.clickOpen` (smoudjs) is the *publisher* H5 SDK's global, not this contract — see [tencent-gdt-playable.md](tencent-gdt-playable.md) §8. |
 
 ## `gameStart` vs `startGame` — two words, swapped, opposite contracts
 

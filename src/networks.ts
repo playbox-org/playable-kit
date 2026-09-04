@@ -269,13 +269,18 @@ export const NETWORKS: Record<string, NetworkConfig> = {
   },
   gdt: {
     id: 'gdt',
-    name: 'GDT (Tencent)',
+    // 优量汇 (Youlianghui) is Tencent Ads' network; 广点通 / GDT is its former
+    // name and still the SDK's global (`GDTUnSdk`). One network, kept under
+    // the historical id. docs/networks/tencent-gdt-playable.md
+    name: 'Tencent Ads (优量汇 / GDT)',
     format: 'zip',
     // 优量汇 spec: 包大小不大于3M. Verified 2026-07-01.
     maxSize: MB3,
     mraid: false,
     sdkUrl: 'https://qzs.gdtimg.com/union/res/union_sdk/page/unjs/unsdk.js',
     singleFileZip: true,
+    // Upload reject without it ("zip file does not contain … in root path").
+    zipRootFiles: ['config.json'],
     inlineAssets: false,
   },
   kwai: {
@@ -313,6 +318,8 @@ export const NETWORKS: Record<string, NetworkConfig> = {
     singleFileZip: true,
     // Mandatory: Luna looks for source.html inside the archive.
     htmlFileName: 'source.html',
+    // Luna reads its manifests next to source.html at the archive root.
+    zipRootFiles: ['luna.json', 'playground.json'],
     zipStructure: '',
   },
   yandex: {
@@ -366,6 +373,10 @@ export const NETWORK_FORBIDDEN_STRINGS: Record<string, string[]> = {
   mintegral: ['preview-util.js', 'preview-util'],
   // Moloco v2.0 spec §2.5 — the payload must not call out to non-Moloco
   // trackers. Guards against analytics SDKs the game pulled in by accident.
+  // Tencent 优量汇 upload validator: `index.html has unsafe function` on any
+  // document.write; the spec also bans `crossorigin` on <script> tags. Both are
+  // plain substring scans, so ours is too (a comment counts).
+  gdt: ['document.write', 'crossorigin'],
   molocoV2: [
     'google-analytics.com',
     'googletagmanager.com',
@@ -384,6 +395,12 @@ export const NETWORK_FORBIDDEN_STRINGS: Record<string, string[]> = {
  * the diagnosis is genuinely non-obvious, so the error carries the fix.
  */
 export const FORBIDDEN_STRING_HINTS: Record<string, string> = {
+  'document.write':
+    'Tencent 优量汇 rejects the upload ("index.html has unsafe function"). ' +
+    'Replace document.write with DOM insertion; check custom inject snippets.',
+  crossorigin:
+    'Tencent 优量汇 forbids the crossorigin attribute on <script> tags. ' +
+    'Drop the attribute — the SDK script must be a plain <script src>.',
   'window.top':
     'Phaser attaches its pointer listeners to window.top by default. ' +
     'Set `input: { windowEvents: false }` in the game config AND strip the ' +

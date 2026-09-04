@@ -325,6 +325,72 @@ describe('Network Adapters', () => {
     })
   })
 
+  // Tencent Ads / 优量汇 — docs/networks/tencent-gdt-playable.md. The SDK is
+  // the only tracked CTA and the ZIP is rejected at upload without config.json.
+  describe('Tencent 优量汇 (gdt) adapter', () => {
+    const html = () => {
+      const builder = new HtmlBuilder(sampleHtml)
+      getAdapter('gdt').transform(builder, defaultConfig)
+      return builder.toHtml()
+    }
+
+    it('injects unsdk.js in <head> over https without crossorigin', () => {
+      const out = html()
+      expect(out).toContain(
+        '<script src="https://qzs.gdtimg.com/union/res/union_sdk/page/unjs/unsdk.js"></script>',
+      )
+      expect(out).not.toContain('crossorigin')
+    })
+
+    it('instantiates GDTUnSdk with type playable and reports CTA via playAble.onClick', () => {
+      const out = html()
+      expect(out).toContain("new window.GDTUnSdk({")
+      expect(out).toContain("type: 'playable'")
+      expect(out).toContain('playAble.onClick()')
+      expect(out).not.toContain('playable.onClick')
+    })
+
+    it('routes window.install() and direct window.open() to the SDK', () => {
+      const out = html()
+      expect(out).toMatch(/window\.install = function\(\) \{ var s = _plbxGdt\(\)/)
+      expect(out).toMatch(/window\.open = function\(u\) \{\s*var s = _plbxGdt\(\)/)
+    })
+
+    it('borrows no other network\'s SDK — the network has no lifecycle', () => {
+      const out = html()
+      expect(out).not.toContain('playableSDK')
+      expect(out).not.toContain('reportGameReady')
+      expect(out).not.toContain('TencentGDT') // smoudjs' unverified global, not the spec
+    })
+
+    it('writes the mandatory config.json with play_direction 0/1/2', () => {
+      const a = getAdapter('gdt')
+      expect(a.getZipConfig({ ...defaultConfig, orientation: 'auto', appName: 'Roadside' })).toEqual({
+        name: 'Roadside',
+        version: '0.0.1',
+        config: { play_direction: 0 },
+      })
+      expect(a.getZipConfig({ ...defaultConfig, orientation: 'portrait' })?.config).toEqual({ play_direction: 1 })
+      expect(a.getZipConfig({ ...defaultConfig, orientation: 'landscape' })?.config).toEqual({ play_direction: 2 })
+      expect(a.getZipConfig({ ...defaultConfig, orientation: 'auto' })?.name).toBe('playable')
+    })
+
+    it('forbids mraid.js, document.write and crossorigin — all upload-time rejects', () => {
+      const f = getAdapter('gdt').getForbiddenStrings()
+      expect(f).toContain('mraid.js')
+      expect(f).toContain('document.write')
+      expect(f).toContain('crossorigin')
+      expect(FORBIDDEN_STRING_HINTS['document.write']).toMatch(/优量汇/)
+    })
+
+    it('emits none of its own forbidden strings', () => {
+      const out = html()
+      for (const needle of getAdapter('gdt').getForbiddenStrings()) {
+        expect(out, needle).not.toContain(needle)
+      }
+    })
+  })
+
   describe('Snapchat adapter', () => {
     it('should reference ScPlayableAd.onCTAClick() in the CTA bridge (not mraid)', () => {
       const adapter = getAdapter('snapchat')

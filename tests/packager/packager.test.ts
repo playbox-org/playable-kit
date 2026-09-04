@@ -164,6 +164,27 @@ describe('packageForNetworks', () => {
     expect(byId['google']).not.toContain('_portrait')
   })
 
+  // Tencent 优量汇 rejects the upload without a root config.json, and the
+  // forbidden-string scan (document.write / crossorigin / mraid.js) must pass
+  // on a REAL packaged build, not just on the adapter's own snippets.
+  it('gdt ships root index.html + config.json with play_direction', async () => {
+    const result = await packageForNetworks({
+      buildDir: MOCK_BUILD,
+      outputDir: PACK_OUTPUT,
+      networks: ['gdt'],
+      config: { ...defaultConfig, orientation: 'landscape' },
+    })
+    expect(result.results).toHaveLength(1)
+    expect(result.results[0].networkId).toBe('gdt')
+    const zip = await JSZip.loadAsync(readFileSync(result.results[0].outputPath))
+    expect(Object.keys(zip.files).sort()).toEqual(['config.json', 'index.html'])
+    const cfg = JSON.parse(await zip.file('config.json')!.async('string'))
+    expect(cfg.config).toEqual({ play_direction: 2 })
+    const html = await zip.file('index.html')!.async('string')
+    expect(html).toContain('playAble.onClick()')
+    expect(html).toContain('/unjs/unsdk.js"></script>')
+  })
+
   it('google orientation archives differ from the primary by the head meta only', async () => {
     const result = await packageForNetworks({
       buildDir: MOCK_BUILD,

@@ -40,6 +40,11 @@ export interface NetworkConfig {
   /** Network whose validator requires a Google Play Store URL in the build (e.g. Unity
    *  Creative Pack). Packager warns (does not fail) if none is found in the build. */
   requiresStoreUrl?: boolean
+  /** Network whose player is KNOWN to run the creative under a Content Security
+   *  Policy that refuses `data:` on connect-src and `blob:` outright — set only
+   *  where that has been observed, not where it is suspected. Previews serve the
+   *  artifact under `STRICT_CSP` by default for these. See preview/csp.ts. */
+  strictCsp?: boolean
 }
 
 export interface PackageConfig {

@@ -108,6 +108,10 @@ export const NETWORKS: Record<string, NetworkConfig> = {
     mraid: false,
     inlineAssets: true,
     dualFormat: true,
+    // Observed in Meta's own player: a `fetch` of an inlined `data:` URI comes
+    // back `TypeError: Failed to fetch`, and `blob:` is granted by neither
+    // img-src nor font-src. See preview/csp.ts for the whole of it.
+    strictCsp: true,
   },
   moloco: {
     id: 'moloco',

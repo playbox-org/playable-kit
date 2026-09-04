@@ -91,6 +91,7 @@ export {
   MOLOCO_V2_TRACKED_MACROS,
 } from './checks/network-checks'
 export type { CheckDef } from './checks/network-checks'
+export { STRICT_CSP, strictCspByDefault } from './preview/csp'
 export { generatePreviewUtil } from './preview/sdk-mocks'
 export type { PreviewUtilParams } from './preview/sdk-mocks'
 export {

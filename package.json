@@ -1,6 +1,6 @@
 {
   "name": "@playbox-ai/playable-kit",
-  "version": "0.3.17",
+  "version": "0.3.18",
   "description": "Playable-ad packaging, validation, checks and preview SDK for the Playbox platform",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -41,8 +41,14 @@
       }
     },
     "./sdk": {
-      "import": { "types": "./dist/sdk.d.ts", "default": "./dist/sdk.js" },
-      "require": { "types": "./dist/sdk.d.cts", "default": "./dist/sdk.cjs" }
+      "import": {
+        "types": "./dist/sdk.d.ts",
+        "default": "./dist/sdk.js"
+      },
+      "require": {
+        "types": "./dist/sdk.d.cts",
+        "default": "./dist/sdk.cjs"
+      }
     }
   },
   "typesVersions": {

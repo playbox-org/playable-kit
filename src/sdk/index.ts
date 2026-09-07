@@ -35,6 +35,25 @@ const EVENT_MEMBER: Record<PlbxEvent, string> = {
  * preview build. CTA = window.open, the ad starts when the creative runs,
  * pause/resume from page visibility, resize from the window.
  */
+/**
+ * Which store this device can actually install from. Mirrors STORE_FOR_DEVICE
+ * in src/packager/network-adapters/base.ts — the stub and the packaged bridge
+ * have to agree, or a creative behaves one way in `vite dev` and another once
+ * packaged. iPadOS ships the desktop Safari UA on purpose, so the Mac platform
+ * string paired with a touch screen is the only tell left.
+ */
+function storeForDevice(b: Bridge): string {
+  const n = (typeof navigator === 'undefined' ? {} : navigator) as Navigator
+  const ios =
+    /iPad|iPhone|iPod/.test(n.userAgent || '') ||
+    (n.platform === 'MacIntel' && n.maxTouchPoints > 1)
+  return (
+    (ios
+      ? b.appstore_url || b.google_play_url
+      : b.google_play_url || b.appstore_url) || ''
+  )
+}
+
 function previewStub(): Bridge {
   const subs: Record<string, Handler[]> = { pause: [], resume: [], resize: [], mute: [] }
   const b: Bridge = {
@@ -42,7 +61,7 @@ function previewStub(): Bridge {
     appstore_url: '',
     _paused: false,
     download(url?: string) {
-      const u = url || this.google_play_url || this.appstore_url || ''
+      const u = url || storeForDevice(this)
       if (u) window.open(u, '_blank')
     },
     game_end() {},

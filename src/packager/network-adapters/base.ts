@@ -78,12 +78,35 @@ export interface NetworkAdapter {
  * the event has already happened, so game code never has to care whether it
  * registered before or after. Cocos boots asynchronously, so it usually did not.
  */
+/**
+ * JS source for "which store can this device actually install from".
+ *
+ * The CTA used to resolve `google_play_url || appstore_url` unconditionally, so
+ * an iPhone tapping it was sent to Google Play — a dead end. Game code cannot
+ * work around that by publishing only one URL: network validators grep the raw
+ * HTML for BOTH as plaintext (src/checks/network-checks.ts), so the pick has to
+ * happen here, at click time.
+ *
+ * Takes the bridge as an argument rather than living on it, so `download` and
+ * the `window.install` override below cannot drift apart. iPadOS ships the
+ * desktop Safari UA on purpose — no "iPad" in it — so the Mac platform string
+ * paired with a touch screen is the only tell left. ES5 on purpose: this runs
+ * in whatever webview the network hands us.
+ */
+const STORE_FOR_DEVICE = `function(b) {
+    var n = window.navigator || {};
+    var ios = /iPad|iPhone|iPod/.test(n.userAgent || "") ||
+      (n.platform === "MacIntel" && n.maxTouchPoints > 1);
+    return (ios ? (b.appstore_url || b.google_play_url)
+                : (b.google_play_url || b.appstore_url)) || "";
+  }`
+
 export function buildPlbxBridge(downloadBody: string, extras?: string): string {
   return `window.plbx_html = window.plbx_html || {
   google_play_url: "",
   appstore_url: "",
   download: function(url) {
-    url = url || this.google_play_url || this.appstore_url || "";
+    url = url || (${STORE_FOR_DEVICE})(this);
     ${downloadBody}
   },
   game_end: function() {},
@@ -180,7 +203,7 @@ export function mraidBridge(): string {
     // (bypassing plbx_html.download). In an MRAID ad container window.open is
     // unreliable/blocked and the network (AppLovin, ironSource, Unity, ...) only
     // tracks the click via mraid.open. Route both to mraid.open.
-    `window.install = function() { var d = window.plbx_html.google_play_url || window.plbx_html.appstore_url || ""; if (window.mraid) { d ? mraid.open(d) : mraid.open(); } };
+    `window.install = function() { var d = (${STORE_FOR_DEVICE})(window.plbx_html); if (window.mraid) { d ? mraid.open(d) : mraid.open(); } };
 var _plbxOrigOpen = window.open;
 window.open = function(u) {
   if (window.mraid) { try { u ? mraid.open(u) : mraid.open(); } catch(e) {} return null; }

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 type AnyFn = (...a: unknown[]) => unknown
 const w = window as unknown as Record<string, unknown>
@@ -36,11 +36,56 @@ function fakeBridge() {
   return { b, calls, subs }
 }
 
+const PLAY_URL = 'https://play.google.com/store/apps/details?id=x'
+const APPSTORE_URL = 'https://apps.apple.com/app/id1'
+
+/**
+ * Repoint navigator for one test. The stub's CTA has to read the device the
+ * same way the packaged bridge does, or a creative behaves one way in `vite
+ * dev` and another once packaged.
+ */
+function fakeNavigator(nav: {
+  userAgent: string
+  platform: string
+  maxTouchPoints: number
+}) {
+  for (const [k, value] of Object.entries(nav)) {
+    Object.defineProperty(window.navigator, k, { value, configurable: true })
+  }
+}
+
+const IPHONE_NAV = {
+  userAgent:
+    'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148',
+  platform: 'iPhone',
+  maxTouchPoints: 5,
+}
+const ANDROID_NAV = {
+  userAgent: 'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 Chrome/119',
+  platform: 'Linux armv8l',
+  maxTouchPoints: 5,
+}
+// iPadOS reports the desktop Safari UA; the touch screen is the only tell.
+const IPADOS_NAV = {
+  userAgent:
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/17.0 Safari/605.1.15',
+  platform: 'MacIntel',
+  maxTouchPoints: 5,
+}
+
 async function freshSdk() {
   vi.resetModules()
   const mod = await import('../../src/sdk/index')
   return mod.default
 }
+
+const REAL_NAV = {
+  userAgent: window.navigator.userAgent,
+  platform: window.navigator.platform,
+  maxTouchPoints: window.navigator.maxTouchPoints,
+}
+
+afterEach(() => fakeNavigator(REAL_NAV))
 
 beforeEach(() => {
   delete w.plbx_html
@@ -83,6 +128,49 @@ describe('plbx sdk', () => {
     expect(open).toHaveBeenCalledWith('https://play.google.com/store/apps/details?id=x', '_blank')
     expect(plbx.is_game_started()).toBe(true)
     expect(plbx.is_muted()).toBe(false)
+  })
+
+  it('preview stub CTA opens the App Store on an iPhone', async () => {
+    const plbx = await freshSdk()
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null)
+    fakeNavigator(IPHONE_NAV)
+    plbx.init()
+    plbx.set_google_play_url(PLAY_URL)
+    plbx.set_app_store_url(APPSTORE_URL)
+    plbx.download()
+    expect(open).toHaveBeenCalledWith(APPSTORE_URL, '_blank')
+  })
+
+  it('preview stub CTA opens Google Play on Android', async () => {
+    const plbx = await freshSdk()
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null)
+    fakeNavigator(ANDROID_NAV)
+    plbx.init()
+    plbx.set_google_play_url(PLAY_URL)
+    plbx.set_app_store_url(APPSTORE_URL)
+    plbx.download()
+    expect(open).toHaveBeenCalledWith(PLAY_URL, '_blank')
+  })
+
+  it('preview stub CTA treats iPadOS as iOS', async () => {
+    const plbx = await freshSdk()
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null)
+    fakeNavigator(IPADOS_NAV)
+    plbx.init()
+    plbx.set_google_play_url(PLAY_URL)
+    plbx.set_app_store_url(APPSTORE_URL)
+    plbx.download()
+    expect(open).toHaveBeenCalledWith(APPSTORE_URL, '_blank')
+  })
+
+  it('preview stub CTA falls back to the store the app actually has', async () => {
+    const plbx = await freshSdk()
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null)
+    fakeNavigator(IPHONE_NAV)
+    plbx.init()
+    plbx.set_google_play_url(PLAY_URL)
+    plbx.download()
+    expect(open).toHaveBeenCalledWith(PLAY_URL, '_blank')
   })
 
   it('preview stub: page visibility drives pause/resume', async () => {

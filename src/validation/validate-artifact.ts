@@ -74,9 +74,16 @@ export function findForbiddenLiterals(
   html: string,
 ): string[] {
   if (!getNetwork(networkId)) return []
-  return getAdapter(networkId)
-    .getForbiddenStrings()
-    .filter((s) => html.includes(s))
+  const adapter = getAdapter(networkId)
+  return [
+    ...adapter.getForbiddenStrings().filter((s) => html.includes(s)),
+    // Shape rules report under their label, so a caller (and the hint lookup)
+    // cannot tell the two kinds apart — which is the point.
+    ...adapter
+      .getForbiddenPatterns()
+      .filter((p) => p.re.test(html))
+      .map((p) => p.label),
+  ]
 }
 
 /**

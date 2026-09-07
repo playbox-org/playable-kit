@@ -1,6 +1,7 @@
 import {
   getNetwork,
   forbiddenStringsFor,
+  forbiddenPatternsFor,
   FORBIDDEN_STRING_HINTS,
 } from '../networks'
 
@@ -150,7 +151,12 @@ export function getNetworkChecks(
   // network's own entries — Unity forbids 'window.top' despite being MRAID.
   // Evaluated statically against the built HTML server-side
   // (findForbiddenLiterals / net.forbiddenLiterals).
-  const forbidden = forbiddenStringsFor(networkId)
+  const forbidden = [
+    ...forbiddenStringsFor(networkId),
+    // Shape rules (Tencent's <script crossorigin>) list under their label too —
+    // the checklist names what the validator rejects, not how we match it.
+    ...forbiddenPatternsFor(networkId).map((p) => p.label),
+  ]
   if (forbidden.length) {
     const quoted = forbidden.map((s) => `'${s}'`).join(', ')
     checks.push({

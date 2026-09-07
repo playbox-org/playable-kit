@@ -1,6 +1,7 @@
 import { HtmlBuilder } from '../html-builder'
 import { NetworkConfig, PackageConfig } from '../../types'
-import { forbiddenStringsFor } from '../../networks'
+import { forbiddenStringsFor, forbiddenPatternsFor } from '../../networks'
+import type { ForbiddenPattern } from '../../networks'
 
 /**
  * An extra copy of the finished artifact that differs from the primary one by
@@ -35,6 +36,13 @@ export interface NetworkAdapter {
    * only after upload.
    */
   getForbiddenStrings(): string[]
+  /**
+   * Validator rules that are a SHAPE rather than a word — matched as a regex
+   * over the final HTML, reported under `label`. Tencent's `crossorigin` ban
+   * is scoped to <script> tags, and as a bare substring it rejects any bundle
+   * that merely names the word (Pixi reads its own `t.crossorigin` option).
+   */
+  getForbiddenPatterns(): ForbiddenPattern[]
   /**
    * Substrings that MUST appear in the final HTML. Packager scans and aborts
    * if any are missing. Guards against silent regressions in transitive code
@@ -770,6 +778,11 @@ export class BaseAdapter implements NetworkAdapter {
 
   getForbiddenStrings(): string[] {
     return forbiddenStringsFor(this.networkId)
+  }
+
+  /** Validator rules that are a shape, not a word. See NETWORK_FORBIDDEN_PATTERNS. */
+  getForbiddenPatterns(): ForbiddenPattern[] {
+    return forbiddenPatternsFor(this.networkId)
   }
 
   getRequiredStrings(): string[] {

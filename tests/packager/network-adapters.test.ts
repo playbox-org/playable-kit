@@ -375,12 +375,20 @@ describe('Network Adapters', () => {
       expect(a.getZipConfig({ ...defaultConfig, orientation: 'auto' })?.name).toBe('playable')
     })
 
-    it('forbids mraid.js, document.write and crossorigin — all upload-time rejects', () => {
-      const f = getAdapter('gdt').getForbiddenStrings()
+    it('forbids mraid.js and document.write as substrings, crossorigin as a tag shape', () => {
+      const a = getAdapter('gdt')
+      const f = a.getForbiddenStrings()
       expect(f).toContain('mraid.js')
       expect(f).toContain('document.write')
-      expect(f).toContain('crossorigin')
+      // NOT a substring: Pixi names the word in JS (`t.crossorigin`) on a build
+      // whose script tags are clean. See NETWORK_FORBIDDEN_PATTERNS.
+      expect(f).not.toContain('crossorigin')
+      const p = a.getForbiddenPatterns()
+      expect(p.map((x) => x.label)).toContain('crossorigin')
+      expect(p[0].re.test('<script src="a.js" crossorigin></script>')).toBe(true)
+      expect(p[0].re.test('II.crossOrigin(g,A,t.crossorigin)')).toBe(false)
       expect(FORBIDDEN_STRING_HINTS['document.write']).toMatch(/优量汇/)
+      expect(FORBIDDEN_STRING_HINTS['crossorigin']).toMatch(/优量汇/)
     })
 
     it('emits none of its own forbidden strings', () => {

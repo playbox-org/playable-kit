@@ -166,7 +166,8 @@ Adapter (`src/packager/network-adapters/gdt.ts`):
 | Instantiate `GDTUnSdk({ type: 'playable' })` | `gdtBridge()`: eager at load **and** lazy on first CTA (`_plbxGdt()`), guarded — SDK may load late or be absent on `file://` / preview |
 | CTA `_gdtUnSdk.playAble.onClick()` | `plbx_html.download`, `window.install()` and direct `window.open(u)` all route there; `window.open` stays only as the no-SDK dev fallback |
 | No lifecycle | nothing wired; `game_end` / `on_game_start` are the inert base defaults |
-| `document.write` / `crossorigin` / `mraid.js` | packaging aborts on any hit in the final HTML (same naive scan the uploader runs) |
+| `document.write` / `mraid.js` | packaging aborts on any hit in the final HTML (same naive scan the uploader runs) |
+| `crossorigin` | packaging aborts on `<script …crossorigin…>` only — `NETWORK_FORBIDDEN_PATTERNS`, not the substring list. The spec scopes the ban to script tags, and as a bare substring it rejects any bundle that merely names the word: Pixi reads its own `IBaseTextureOptions.crossorigin` as `t.crossorigin` throughout `@pixi/core`, so every Pixi playable failed to package on a build whose script tags were already clean (the classic-bundle rewrite strips the attribute before packaging anyway). |
 | Preview (`src/preview/sdk-mocks.ts`) | `expectedCtaMethod('gdt') = 'gdt_onclick'`; accessor trap on `window.GDTUnSdk` wraps the real constructor and decorates `playAble.onClick` with the beacon; mock constructor after ~3 s offline. A bare `window.open` now reads as an **incorrect** CTA. |
 
 Verified on the roadside Cocos fixture: ZIP = `index.html` + `config.json`,

@@ -374,9 +374,10 @@ export const NETWORK_FORBIDDEN_STRINGS: Record<string, string[]> = {
   // Moloco v2.0 spec §2.5 — the payload must not call out to non-Moloco
   // trackers. Guards against analytics SDKs the game pulled in by accident.
   // Tencent 优量汇 upload validator: `index.html has unsafe function` on any
-  // document.write; the spec also bans `crossorigin` on <script> tags. Both are
-  // plain substring scans, so ours is too (a comment counts).
-  gdt: ['document.write', 'crossorigin'],
+  // document.write — a genuine substring rule, a comment counts. The spec's
+  // other ban, `crossorigin`, is NOT one: it is scoped to <script> tags, so it
+  // lives in NETWORK_FORBIDDEN_PATTERNS below. See the note there.
+  gdt: ['document.write'],
   molocoV2: [
     'google-analytics.com',
     'googletagmanager.com',
@@ -384,6 +385,33 @@ export const NETWORK_FORBIDDEN_STRINGS: Record<string, string[]> = {
     'facebook.net/en_US/fbevents.js',
     'connect.facebook.net',
   ],
+}
+
+/**
+ * Validator rules that are a SHAPE rather than a word, keyed by network id.
+ *
+ * Kept apart from NETWORK_FORBIDDEN_STRINGS because most upload validators
+ * really do run a naive substring scan, and modelling those as anything else
+ * would understate them. This one does not: Tencent 优量汇 bans `crossorigin`
+ * ON A <script> TAG (spec §III), and as a bare substring that rule rejects any
+ * bundle that merely names the word — which Pixi.js does, reading its own
+ * `IBaseTextureOptions.crossorigin` as `t.crossorigin` all through
+ * `@pixi/core`. Every Pixi playable failed to package for Tencent on a build
+ * whose script tags were already clean.
+ *
+ * `label` is what the packager, the validator and the preview checklist print,
+ * and the key into FORBIDDEN_STRING_HINTS — so a shape rule carries the same
+ * remediation text a substring rule does.
+ */
+export type ForbiddenPattern = { label: string; re: RegExp }
+
+export const NETWORK_FORBIDDEN_PATTERNS: Record<string, ForbiddenPattern[]> = {
+  gdt: [{ label: 'crossorigin', re: /<script\b[^>]*\scrossorigin\b/i }],
+}
+
+/** Shape rules for one network; empty for most. */
+export function forbiddenPatternsFor(networkId: string): ForbiddenPattern[] {
+  return NETWORK_FORBIDDEN_PATTERNS[networkId] ?? []
 }
 
 /**

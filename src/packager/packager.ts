@@ -17,6 +17,7 @@ import {
   NETWORKS,
   maxSizeForFormat,
   FORBIDDEN_STRING_HINTS,
+  type ForbiddenPattern,
 } from '../networks'
 import {
   PackageResult,
@@ -469,6 +470,7 @@ export async function packageForNetworks(
           combined,
           adapter.getForbiddenStrings(),
           network.name,
+          adapter.getForbiddenPatterns(),
         )
         assertHasRequiredStrings(
           combined,
@@ -615,6 +617,7 @@ export async function packageForNetworks(
             finalHtml,
             adapter.getForbiddenStrings(),
             network.name,
+            adapter.getForbiddenPatterns(),
           )
           assertHasRequiredStrings(
             finalHtml,
@@ -718,6 +721,7 @@ export async function packageForNetworks(
                   html,
                   adapter.getForbiddenStrings(),
                   network.name,
+                  adapter.getForbiddenPatterns(),
                 )
                 assertHasRequiredStrings(
                   html,
@@ -759,6 +763,7 @@ export async function packageForNetworks(
             zipBranchHtml,
             adapter.getForbiddenStrings(),
             network.name,
+            adapter.getForbiddenPatterns(),
           )
           assertHasRequiredStrings(
             zipBranchHtml,
@@ -863,9 +868,16 @@ function assertNoForbiddenStrings(
   html: string,
   forbidden: string[],
   networkName: string,
+  patterns: ForbiddenPattern[] = [],
 ): void {
-  if (!forbidden.length) return
-  const found = forbidden.filter((needle) => html.includes(needle))
+  if (!forbidden.length && !patterns.length) return
+  const found = [
+    ...forbidden.filter((needle) => html.includes(needle)),
+    // Shape rules (Tencent's `crossorigin`, a <script> attribute rather than a
+    // word ban) report under the same label as a substring rule, so the message
+    // and its remediation text read identically either way.
+    ...patterns.filter((p) => p.re.test(html)).map((p) => p.label),
+  ]
   if (found.length === 0) return
   const hints = found
     .map((needle) => FORBIDDEN_STRING_HINTS[needle])

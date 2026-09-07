@@ -8,7 +8,8 @@ import type { Orientation, PackageConfig } from './types'
 const USAGE = `playable-kit ${KIT_VERSION}
 
   playable-kit package [--build dist] [--out dist-networks] [--networks all|a,b,c]
-                       [--name "Asset Title"] [--orientation auto|portrait|landscape]
+                       [--name "Asset Title"] [--app-name "Creative Name"]
+                       [--orientation auto|portrait|landscape]
                        [--android URL] [--ios URL] [--input auto|loader|single-file] [--splash]
                        [--splash-logo <path>]
 
@@ -35,6 +36,7 @@ export async function main(
       out: { type: 'string', default: 'dist-networks' },
       networks: { type: 'string', default: 'all' },
       name: { type: 'string' },
+      'app-name': { type: 'string' },
       orientation: { type: 'string', default: 'auto' },
       android: { type: 'string' },
       ios: { type: 'string' },
@@ -66,6 +68,11 @@ export async function main(
     storeUrlAndroid: values.android,
     storeUrlIos: values.ios,
     input: values.input as PackageConfig['input'],
+    // The creative's own name, distinct from --name (which is the FILE name and
+    // gets sanitized to [A-Za-z0-9._-]). Tencent puts it in config.json and
+    // shows it in their media centre; Luna would take it too, but deliberately
+    // does not fall back to anything — see the note in packager.ts.
+    appName: values['app-name'],
     showSplash: !!values.splash,
     customSplashLogo: values['splash-logo']
       ? resolve(values['splash-logo'])

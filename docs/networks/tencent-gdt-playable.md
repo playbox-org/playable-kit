@@ -83,7 +83,7 @@ Consequences:
 
 | Field | Meaning |
 |---|---|
-| `name` | Creative name (shown in the media-center list). |
+| `name` | Creative name (shown in the media-center list). From `PackageConfig.appName` — CLI `--app-name "Hole It"`; falls back to `playable`. NOT `--name`, which is the file name and is sanitized to `[A-Za-z0-9._-]`. |
 | `version` | Creative version string. |
 | `config.play_direction` | Supported play direction. **`0` = both (default), `1` = portrait (竖版), `2` = landscape (横版).** |
 

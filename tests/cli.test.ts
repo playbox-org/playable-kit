@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync, rmSync } from 'fs'
 import { join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
 import { main } from '../src/cli'
+import JSZip from 'jszip'
 
 const BUILD = join(__dirname, 'fixtures/single-file-build')
 const OUT = join(__dirname, 'fixtures/cli-out')
@@ -55,6 +56,32 @@ describe('playable-kit package', () => {
     expect(codeOff).toBe(0)
     const htmlOff = readFileSync(join(withoutSplash, 'applovin', 'My_Game_applovin.html'), 'utf-8')
     expect(htmlOff).not.toContain('id="s"')
+  })
+
+  // Tencent's config.json carries a creative NAME shown in their media centre,
+  // and it is the only place a network asks for one. `--name` is the file name
+  // and is sanitized (spaces → underscores), so it cannot double as this.
+  it('--app-name names the creative inside the package, --name does not', async () => {
+    const out = join(OUT, 'app-name')
+    const read = async (dir: string) =>
+      JSON.parse(
+        await (
+          await JSZip.loadAsync(readFileSync(join(dir, 'gdt', 'My_Game_gdt.zip')))
+        )
+          .file('config.json')!
+          .async('string'),
+      )
+
+    expect(
+      await main(['package', '--build', BUILD, '--out', out, '--networks', 'gdt', '--name', 'My Game', '--app-name', 'Hole It'], () => {}),
+    ).toBe(0)
+    expect((await read(out)).name).toBe('Hole It')
+
+    const bare = join(OUT, 'app-name-absent')
+    expect(
+      await main(['package', '--build', BUILD, '--out', bare, '--networks', 'gdt', '--name', 'My Game'], () => {}),
+    ).toBe(0)
+    expect((await read(bare)).name).toBe('playable')
   })
 
   it('no subcommand → usage, exit 1', async () => {

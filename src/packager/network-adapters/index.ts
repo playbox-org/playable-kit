@@ -10,6 +10,7 @@ import { VungleAdapter } from './vungle'
 import { MolocoV2Adapter } from './moloco-v2'
 import { LunaAdapter } from './luna'
 import { GdtAdapter } from './gdt'
+import { PlbxAdapter } from './plbx'
 import { getNetwork } from '../../networks'
 import { NetworkConfig } from '../../types'
 
@@ -31,6 +32,7 @@ const CUSTOM_ADAPTERS: Record<string, AdapterConstructor> = {
   vungle: VungleAdapter,
   luna: LunaAdapter,
   gdt: GdtAdapter,
+  plbx: PlbxAdapter,
 }
 
 export function getAdapter(networkId: string): NetworkAdapter {

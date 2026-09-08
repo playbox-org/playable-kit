@@ -134,6 +134,21 @@ describe('NETWORKS registry', () => {
     expect(getNetwork('vungle')!.htmlFileName).toBe('ad.html')
   })
 
+  it('plbx is a single-file zip whose inner HTML is source.html and whose ceiling fits the registry rule', () => {
+    // The repack source: never uploaded to a network, consumed only by the
+    // plbx-collector repack service. Same archive shape as luna (inner
+    // source.html, no wrapper) plus build.zip + plbx.json from its adapter.
+    const n = getNetwork('plbx')!
+    expect(n).toBeDefined()
+    expect(n.format).toBe('zip')
+    expect(n.singleFileZip).toBe(true)
+    expect(n.inlineAssets).toBe(true)
+    expect(n.mraid).toBe(false)
+    expect(n.htmlFileName).toBe('source.html')
+    expect(n.zipStructure).toBe('')
+    expect(n.maxSize).toBe(10 * 1024 * 1024)
+  })
+
   it('getAllNetworks should return all networks', () => {
     const all = getAllNetworks()
     expect(all.length).toBe(Object.keys(NETWORKS).length)

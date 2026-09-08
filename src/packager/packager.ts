@@ -11,6 +11,7 @@ import {
 import { join, relative, extname, dirname, basename } from 'path'
 import { HtmlBuilder } from './html-builder'
 import { getAdapter } from './network-adapters'
+import type { ZipExtraFile } from './network-adapters/base'
 import { buildZip } from './zip-builder'
 import {
   getNetwork,
@@ -253,11 +254,14 @@ export async function packageForNetworks(
 
       const adapter = getAdapter(networkId)
 
-      // Only the luna target sees the resolved store URLs / appName above.
-      // Every other network is packaged with the caller's config verbatim, so
-      // its artifact stays byte-identical to what it was before Luna existed.
+      // Only the luna and plbx targets see the resolved store URLs / appName
+      // above (luna.json and plbx.json carry them). Every other network is
+      // packaged with the caller's config verbatim, so its artifact stays
+      // byte-identical to what it was before Luna existed.
       const packageConfig: PackageConfig =
-        networkId === 'luna' ? lunaConfig : options.config
+        networkId === 'luna' || networkId === 'plbx'
+          ? lunaConfig
+          : options.config
 
       // Clone HTML and apply network adapter
       const builder = new HtmlBuilder(baseHtml)
@@ -627,6 +631,16 @@ export async function packageForNetworks(
 
           if (wrapInZip) {
             // Wrap the single HTML in a ZIP (+ optional config.json)
+            // Ask the adapter for its extra members BEFORE anything is
+            // written next to the build: plbx's `build.zip` is a snapshot of
+            // `options.buildDir`, and an `outputDir` nested under it (the
+            // extension's default) would otherwise hand the hook a build dir
+            // that already contains this run's `_temp_<networkId>/` and the
+            // half-written archive.
+            const adapterExtraFiles = await adapter.getZipExtraFiles(
+              packageConfig,
+              { buildDir: options.buildDir, kitVersion: KIT_VERSION },
+            )
             const tempDir = join(dirname(outputPath), `_temp_${networkId}`)
             mkdirSync(tempDir, { recursive: true })
             const named = resolveInnerHtmlName(
@@ -637,7 +651,7 @@ export async function packageForNetworks(
             )
             outputPath = named.outputPath
 
-            const extraFiles: Array<{ zipPath: string; content: string }> = []
+            const extraFiles: ZipExtraFile[] = []
             const zipConfig = adapter.getZipConfig(packageConfig)
             if (zipConfig) {
               extraFiles.push({
@@ -646,8 +660,9 @@ export async function packageForNetworks(
               })
             }
             // Everything the hard-coded config.json can't express (Luna's
-            // luna.json + playground.json). Default is an empty list.
-            extraFiles.push(...adapter.getZipExtraFiles(packageConfig))
+            // luna.json + playground.json, plbx's build.zip + plbx.json).
+            // Default is an empty list; gathered above the staging writes.
+            extraFiles.push(...adapterExtraFiles)
 
             // Usually one archive; Google also wants a fixed-orientation copy
             // per orientation, which is the same payload with one <head> meta
@@ -754,6 +769,12 @@ export async function packageForNetworks(
           // ZIP — copy build dir + transformed HTML + extras
           options.onProgress?.(networkId, 'processing', `Building ZIP...`)
 
+          // Same ordering rule as the wrap branch above: the adapter sees the
+          // build dir before the packager stages anything inside it.
+          const adapterExtraFiles = await adapter.getZipExtraFiles(
+            packageConfig,
+            { buildDir: options.buildDir, kitVersion: KIT_VERSION },
+          )
           const tempDir = join(dirname(outputPath), `_temp_${networkId}`)
           mkdirSync(tempDir, { recursive: true })
 
@@ -795,7 +816,7 @@ export async function packageForNetworks(
             rmSync(copiedIndexHtml, { force: true })
           writeFileSync(join(tempDir, plainNamed.innerHtmlName), zipBranchHtml)
 
-          const extraFiles: Array<{ zipPath: string; content: string }> = []
+          const extraFiles: ZipExtraFile[] = []
 
           const zipConfig = adapter.getZipConfig(packageConfig)
           if (zipConfig) {
@@ -805,7 +826,7 @@ export async function packageForNetworks(
             })
           }
           // See the wrap branch — adapter-supplied manifests alongside the HTML.
-          extraFiles.push(...adapter.getZipExtraFiles(packageConfig))
+          extraFiles.push(...adapterExtraFiles)
 
           const zipResult = await buildZip({
             sourceDir: tempDir,

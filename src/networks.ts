@@ -322,6 +322,27 @@ export const NETWORKS: Record<string, NetworkConfig> = {
     zipRootFiles: ['luna.json', 'playground.json'],
     zipStructure: '',
   },
+  plbx: {
+    id: 'plbx',
+    name: 'Playbox (repack source)',
+    format: 'zip',
+    // The repack source, not a delivery network: ONE archive (source.html +
+    // build.zip + plbx.json, see PlbxAdapter) the extension hands to the
+    // private plbx-collector repack service, which re-packages the build for
+    // every real network and injects telemetry. Never uploaded to a network,
+    // so exclude it from any "all networks" list that means ad networks.
+    // 10 MB is the registry-wide ceiling tests/networks.test.ts enforces on
+    // every entry ("<= 10MB"); a real build.zip + source.html may exceed it,
+    // which only flips withinLimit (advisory) — the archive is still written.
+    maxSize: 10 * 1024 * 1024,
+    // No wrapper of its own (the repack applies each network's), and false
+    // here makes 'mraid.js' a forbidden string, same as luna.
+    mraid: false,
+    inlineAssets: true,
+    singleFileZip: true,
+    htmlFileName: 'source.html',
+    zipStructure: '',
+  },
   yandex: {
     id: 'yandex',
     name: 'Yandex',

@@ -66,7 +66,25 @@ export interface NetworkAdapter {
    */
   getZipExtraFiles(
     config: PackageConfig,
-  ): Array<{ zipPath: string; content: string }>
+    ctx?: ZipExtraFilesContext,
+  ): ZipExtraFile[] | Promise<ZipExtraFile[]>
+}
+
+/** One file placed in the ZIP next to the HTML by `getZipExtraFiles`. */
+export interface ZipExtraFile {
+  zipPath: string
+  content: string | Buffer
+}
+
+/**
+ * What the packager knows and an adapter's `getZipExtraFiles` may need: the
+ * build directory it is packaging (the `plbx` target stores it whole as
+ * `build.zip`) and the kit's own version (for a manifest). Optional on the
+ * hook so existing one-argument callers keep compiling.
+ */
+export interface ZipExtraFilesContext {
+  buildDir: string
+  kitVersion: string
 }
 
 /**
@@ -768,7 +786,8 @@ export class BaseAdapter implements NetworkAdapter {
 
   getZipExtraFiles(
     _config: PackageConfig,
-  ): Array<{ zipPath: string; content: string }> {
+    _ctx?: ZipExtraFilesContext,
+  ): ZipExtraFile[] | Promise<ZipExtraFile[]> {
     return []
   }
 

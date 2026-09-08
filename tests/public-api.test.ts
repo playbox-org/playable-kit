@@ -60,6 +60,10 @@ const REQUIRED_EXPORTS = [
   'applySingleFileRewrite',
   'SINGLE_FILE_SPLASH_HOOK_JS',
   'htmlToPayloadJs',
+  // added for the plbx target / plbx-collector repack service — the registry
+  // and the per-format ceiling it re-checks every injected artifact against
+  'NETWORKS',
+  'maxSizeForFormat',
 ] as const
 
 describe('public API barrel', () => {

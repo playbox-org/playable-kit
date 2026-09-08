@@ -1,5 +1,5 @@
 import { NetworkConfig, PackageConfig } from '../../types'
-import { BaseAdapter, lunaBridge } from './base'
+import { BaseAdapter, lunaBridge, ZipExtraFilesContext } from './base'
 
 /** luna.json `default.orientation` — Luna's own vocabulary, not ours. */
 const ORIENTATION_MAP: Record<string, string> = {
@@ -40,6 +40,7 @@ export class LunaAdapter extends BaseAdapter {
 
   getZipExtraFiles(
     config: PackageConfig,
+    _ctx?: ZipExtraFilesContext,
   ): Array<{ zipPath: string; content: string }> {
     // Two different values on purpose. `applicationName` is the app IDENTITY
     // Luna publishes into the client's Playworks account — spec §2 maps it to

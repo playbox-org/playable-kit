@@ -203,10 +203,45 @@ describe('validateAxonEvents', () => {
 
   it('accepts CHALLENGE_STARTED with any one completion event', () => {
     const checks = validateAxonEvents({
-      events: ['DISPLAYED', 'CHALLENGE_STARTED', 'CHALLENGE_RETRY'],
+      events: ['DISPLAYED', 'CHALLENGE_STARTED', 'CHALLENGE_SOLVED'],
       redefinesAnalytics: false,
     })
     expect(failed(checks)).toEqual([])
+  })
+
+  it('accepts CHALLENGE_STARTED with only a CHALLENGE_PASS_* follow-up', () => {
+    const checks = validateAxonEvents({
+      events: ['DISPLAYED', 'CHALLENGE_STARTED', 'CHALLENGE_PASS_50'],
+      redefinesAnalytics: false,
+    })
+    expect(failed(checks)).toEqual([])
+  })
+
+  it('errors when CHALLENGE_* events are used without CHALLENGE_STARTED', () => {
+    const checks = validateAxonEvents({
+      events: ['DISPLAYED', 'CHALLENGE_PASS_25', 'CHALLENGE_SOLVED'],
+      redefinesAnalytics: false,
+    })
+    const check = checks.find((c) => c.id === 'challenge_requires_started')
+    expect(check?.ok).toBe(false)
+    expect(check?.level).toBe('error')
+    expect(check?.detail).toContain('CHALLENGE_PASS_25')
+    expect(check?.detail).toContain('CHALLENGE_SOLVED')
+  })
+
+  it('does not raise challenge_requires_started without any CHALLENGE_* event', () => {
+    const checks = validateAxonEvents({ events: ['DISPLAYED'] })
+    expect(
+      checks.find((c) => c.id === 'challenge_requires_started'),
+    ).toBeUndefined()
+  })
+
+  it('warns when CHALLENGE_RETRY is used without CHALLENGE_FAILED', () => {
+    const checks = validateAxonEvents({
+      events: ['DISPLAYED', 'CHALLENGE_STARTED', 'CHALLENGE_RETRY'],
+      redefinesAnalytics: false,
+    })
+    expect(failed(checks)).toEqual(['retry_requires_failed'])
   })
 
   it('warns when ALPlayableAnalytics is redefined', () => {
@@ -263,14 +298,43 @@ describe('validateAxonSequence', () => {
     expect(byId(checks, 'all_conformant')?.ok).toBe(false)
   })
 
-  it('fails order when a challenge completion fires before CHALLENGE_STARTED', () => {
+  it('errors when a CHALLENGE_* event fires and CHALLENGE_STARTED never does', () => {
+    // AppLovin rejection: challenge_events_without_started
+    const checks = validateAxonSequence([
+      'DISPLAYED',
+      'CHALLENGE_PASS_50',
+      'CHALLENGE_SOLVED',
+    ])
+    const check = byId(checks, 'challenge_requires_started')
+    expect(check?.ok).toBe(false)
+    expect(check?.level).toBe('error')
+    expect(byId(checks, 'all_conformant')?.ok).toBe(false)
+    expect(byId(checks, 'all_conformant')?.level).toBe('error')
+  })
+
+  it('errors when a CHALLENGE_* event fires before CHALLENGE_STARTED', () => {
     const checks = validateAxonSequence([
       'DISPLAYED',
       'CHALLENGE_SOLVED',
       'CHALLENGE_STARTED',
     ])
+    const check = byId(checks, 'challenge_requires_started')
+    expect(check?.ok).toBe(false)
+    expect(check?.level).toBe('error')
+    expect(check?.detail).toContain('CHALLENGE_SOLVED')
+    // One violation, one row — not duplicated as an order warning.
+    expect(byId(checks, 'order')?.ok).toBe(true)
+  })
+
+  it('fails order when CHALLENGE_RETRY fires before CHALLENGE_FAILED', () => {
+    const checks = validateAxonSequence([
+      'DISPLAYED',
+      'CHALLENGE_STARTED',
+      'CHALLENGE_RETRY',
+      'CHALLENGE_FAILED',
+    ])
     expect(byId(checks, 'order')?.ok).toBe(false)
-    expect(byId(checks, 'order')?.detail).toContain('CHALLENGE_STARTED')
+    expect(byId(checks, 'order')?.detail).toContain('CHALLENGE_FAILED')
   })
 
   it('fails order when ENDCARD_SHOWN fires before CHALLENGE_SOLVED', () => {
@@ -367,7 +431,9 @@ describe('validateAxonSequence', () => {
     const checks = validateAxonSequence([
       'DISPLAYED',
       'CHALLENGE_STARTED',
+      'CHALLENGE_FAILED',
       'CHALLENGE_RETRY',
+      'CHALLENGE_FAILED',
       'CHALLENGE_RETRY',
       'CHALLENGE_SOLVED',
     ])

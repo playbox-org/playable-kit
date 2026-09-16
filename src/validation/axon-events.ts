@@ -4,7 +4,7 @@ import { join, extname } from 'path'
 /**
  * AppLovin "Axon" playable-analytics event conformance.
  *
- * Spec: https://support.axon.ai/en/growth/promoting-your-apps/creatives/playable-analytics-integration
+ * Spec: https://support.applovin.com/en/growth/promoting-your-apps/welcome-to-applovin/playable-analytics-integration
  *
  * The playable fires analytics through the SDK-provided global:
  *   if (typeof window.ALPlayableAnalytics != 'undefined') {
@@ -17,8 +17,12 @@ import { join, extname } from 'path'
  *     custom event.
  *   - DISPLAYED is the only mandatory event.
  *   - LOADING and LOADED are a pair: fire both, or neither.
- *   - If CHALLENGE_STARTED is used, at least one of CHALLENGE_SOLVED /
- *     CHALLENGE_FAILED / CHALLENGE_RETRY must be used.
+ *   - The other CHALLENGE_* events are only valid together with
+ *     CHALLENGE_STARTED, which must fire first (AppLovin rejects the creative
+ *     as `challenge_events_without_started` otherwise).
+ *   - If CHALLENGE_STARTED is used, at least one other CHALLENGE_* event must
+ *     be used.
+ *   - CHALLENGE_RETRY is only valid together with CHALLENGE_FAILED.
  *   - The creative must NOT define ALPlayableAnalytics itself — the SDK does.
  *
  * These events are authored by the game developer; the packager never injects
@@ -27,7 +31,7 @@ import { join, extname } from 'path'
 
 /** AppLovin Axon playable-analytics event spec documentation. */
 export const AXON_SPEC_URL =
-  'https://support.axon.ai/en/growth/promoting-your-apps/creatives/playable-analytics-integration'
+  'https://support.applovin.com/en/growth/promoting-your-apps/welcome-to-applovin/playable-analytics-integration'
 
 /** Canonical Axon playable-analytics event names (spec, in lifecycle order). */
 export const AXON_EVENTS = [
@@ -49,11 +53,15 @@ export type AxonEvent = (typeof AXON_EVENTS)[number]
 
 const AXON_EVENT_SET: ReadonlySet<string> = new Set(AXON_EVENTS)
 
-/** Any one of these satisfies the CHALLENGE_STARTED → completion requirement. */
-const CHALLENGE_COMPLETION_EVENTS = [
-  'CHALLENGE_SOLVED',
+/** The spec's "Conditional" challenge events: each requires CHALLENGE_STARTED
+ *  (fired first), and CHALLENGE_STARTED requires at least one of them. */
+const CHALLENGE_CONDITIONAL_EVENTS = [
   'CHALLENGE_FAILED',
   'CHALLENGE_RETRY',
+  'CHALLENGE_PASS_25',
+  'CHALLENGE_PASS_50',
+  'CHALLENGE_PASS_75',
+  'CHALLENGE_SOLVED',
 ] as const
 
 /** File extensions we treat as text/source and scan for trackEvent() calls. */
@@ -194,15 +202,37 @@ export function validateAxonEvents(usage: AxonUsage): AxonCheck[] {
     })
   }
 
+  const conditional = CHALLENGE_CONDITIONAL_EVENTS.filter((e) => set.has(e))
+  if (conditional.length > 0) {
+    checks.push({
+      id: 'challenge_requires_started',
+      label: 'CHALLENGE_* events come with CHALLENGE_STARTED',
+      ok: set.has('CHALLENGE_STARTED'),
+      // AppLovin rejects this outright (challenge_events_without_started).
+      level: 'error',
+      detail: `${conditional.join(', ')} used without CHALLENGE_STARTED — AppLovin rejects challenge events without a preceding CHALLENGE_STARTED.`,
+    })
+  }
+
   if (set.has('CHALLENGE_STARTED')) {
-    const hasCompletion = CHALLENGE_COMPLETION_EVENTS.some((e) => set.has(e))
     checks.push({
       id: 'challenge_completion',
-      label: 'Challenge has a completion event',
-      ok: hasCompletion,
+      label: 'Challenge has a follow-up event',
+      ok: conditional.length > 0,
       level: 'warn',
       detail:
-        'With CHALLENGE_STARTED you must fire at least one of CHALLENGE_SOLVED / CHALLENGE_FAILED / CHALLENGE_RETRY.',
+        'With CHALLENGE_STARTED you must also fire at least one of CHALLENGE_FAILED / CHALLENGE_RETRY / CHALLENGE_PASS_* / CHALLENGE_SOLVED.',
+    })
+  }
+
+  if (set.has('CHALLENGE_RETRY')) {
+    checks.push({
+      id: 'retry_requires_failed',
+      label: 'CHALLENGE_RETRY comes with CHALLENGE_FAILED',
+      ok: set.has('CHALLENGE_FAILED'),
+      level: 'warn',
+      detail:
+        'CHALLENGE_RETRY is only valid when CHALLENGE_FAILED is implemented — fire FAILED on the failure state, then RETRY.',
     })
   }
 
@@ -237,17 +267,14 @@ const isChallengeEvent = (name: string): boolean =>
 // Pairwise lifecycle-order invariants: [a, b] means a's first fire must not come
 // after b's first fire. Checked only for events that actually fired, against
 // first-occurrence index — robust to retry loops that re-fire later events.
+// CHALLENGE_STARTED → other CHALLENGE_* is NOT here: it must also catch a missing
+// STARTED, so it's the error-level `challenge_requires_started` check instead.
 const ORDER_PAIRS: ReadonlyArray<readonly [string, string]> = [
   ['LOADING', 'LOADED'],
   ['LOADING', 'DISPLAYED'],
   ['LOADED', 'DISPLAYED'],
   ['DISPLAYED', 'CHALLENGE_STARTED'],
-  ['CHALLENGE_STARTED', 'CHALLENGE_PASS_25'],
-  ['CHALLENGE_STARTED', 'CHALLENGE_PASS_50'],
-  ['CHALLENGE_STARTED', 'CHALLENGE_PASS_75'],
-  ['CHALLENGE_STARTED', 'CHALLENGE_SOLVED'],
-  ['CHALLENGE_STARTED', 'CHALLENGE_FAILED'],
-  ['CHALLENGE_STARTED', 'CHALLENGE_RETRY'],
+  ['CHALLENGE_FAILED', 'CHALLENGE_RETRY'],
   ['CHALLENGE_PASS_25', 'CHALLENGE_PASS_50'],
   ['CHALLENGE_PASS_50', 'CHALLENGE_PASS_75'],
   ['DISPLAYED', 'ENDCARD_SHOWN'],
@@ -289,7 +316,7 @@ export function validateAxonSequence(
   }
 
   // Distinct events in first-seen order → reuse the set-based checks (presence,
-  // unknown names, LOADED-with-LOADING, challenge completion). Redefinition is a
+  // unknown names, LOADED-with-LOADING, challenge dependencies). Redefinition is a
   // static-only concern, so it's omitted at runtime.
   const distinct: string[] = []
   const seen = new Set<string>()
@@ -301,11 +328,27 @@ export function validateAxonSequence(
   }
   const checks = validateAxonEvents({ events: distinct })
 
-  // Lifecycle order (pairwise, first-occurrence).
   const firstIdx: Record<string, number> = {}
   sequence.forEach((e, i) => {
     if (firstIdx[e] === undefined) firstIdx[e] = i
   })
+
+  // The set check only knows STARTED is present; at runtime it must also have
+  // fired BEFORE every other CHALLENGE_* event.
+  const startedCheck = checks.find((c) => c.id === 'challenge_requires_started')
+  if (startedCheck?.ok) {
+    const early = CHALLENGE_CONDITIONAL_EVENTS.filter(
+      (e) =>
+        firstIdx[e] !== undefined &&
+        firstIdx[e] < firstIdx['CHALLENGE_STARTED'],
+    )
+    if (early.length > 0) {
+      startedCheck.ok = false
+      startedCheck.detail = `${early.join(', ')} fired before CHALLENGE_STARTED — AppLovin rejects challenge events without a preceding CHALLENGE_STARTED.`
+    }
+  }
+
+  // Lifecycle order (pairwise, first-occurrence).
   const orderViolations = ORDER_PAIRS.filter(
     ([a, b]) =>
       firstIdx[a] !== undefined &&

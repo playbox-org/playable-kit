@@ -167,7 +167,7 @@ export function buildPlbxBridge(downloadBody: string, extras?: string): string {
   game_retry: function() {},
   is_audio: function() { return true; },
   is_hide_download: function() { return false; },
-  is_muted: function() { return false; },
+  is_muted: function() { return this._muted; },
   // Default: the ad starts when the creative runs. Only Mintegral has a
   // separate container-fired start (window.gameStart, §5), and its adapter
   // replaces these two. Everywhere else — including the networks that gate boot
@@ -178,9 +178,18 @@ export function buildPlbxBridge(downloadBody: string, extras?: string): string {
   // Fires only where the container signals the end of the ad (Mintegral §7
   // today). Registering elsewhere is harmless and keeps game code portable.
   on_game_close: function(cb) { if (typeof cb !== 'function') return; },
-  // Luna reports real mute state through this; elsewhere the container never
-  // changes it, so a subscriber gets the current value once and nothing more.
-  on_mute_change: function(cb) { if (typeof cb === 'function') { try { cb(this.is_muted()); } catch (e) {} } },
+  // Subscribers get the current state at once, then every change. set_muted is
+  // container-side like set_paused: Luna's luna:mute/unmute and preview hosts
+  // (the Playbox toolbar Mute) call it; game code only subscribes.
+  _muted: false,
+  _mute_subs: [],
+  on_mute_change: function(cb) { if (typeof cb !== 'function') return; this._mute_subs.push(cb); try { cb(this._muted); } catch (e) {} },
+  set_muted: function(m) {
+    m = !!m;
+    if (m === this._muted) return;
+    this._muted = m;
+    for (var i = 0; i < this._mute_subs.length; i++) { try { this._mute_subs[i](m); } catch (e) {} }
+  },
   // Container signals: paused = not viewable / page hidden / host said so.
   // Subscribers replay: on_pause fires at once when already paused, on_resize
   // at once with the current size — same late-subscriber rule as on_*.
@@ -684,6 +693,7 @@ function _plbx_luna_loud(ctx) {
 })();
 function _plbx_luna_audio(muted) {
   _plbx_luna_muted = muted;
+  try { window.plbx_html.set_muted(muted); } catch(e) {}
   for (var i = 0; i < _plbx_luna_ctxs.length; i++) {
     // Per-context guard: a closed/broken context must not cost the others
     // their mute.

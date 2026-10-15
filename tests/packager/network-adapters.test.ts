@@ -41,7 +41,9 @@ describe('Network Adapters', () => {
       'unity',
       'ironsource',
       'adcolony',
+      'digitalturbine',
       'appreciate',
+      'appier',
       'chartboost',
       'liftoff',
     ]

@@ -147,7 +147,7 @@ an adapter may make one *do* more, never make it disappear.
 | `is_game_started()` | `true` | Mintegral: false until the container fires `gameStart` |
 | `on_game_start(cb)` | fires **immediately** | Mintegral: waits for the container's `gameStart` (§5) |
 | `on_game_close(cb)` | registers, never fires | Mintegral: the container's `gameClose` (§7) |
-| `is_muted()` / `on_mute_change(cb)` | `false`, one immediate call | Luna: real container mute state |
+| `is_muted()` / `on_mute_change(cb)` / `set_muted(m)` | `false`; subscribers get the current state at once, then every `set_muted` change | Luna: `luna:mute`/`luna:unmute` → `set_muted`; Moloco V2: `start_muted` + MRAID `audioVolumeChange`; preview hosts (Playbox toolbar Mute) call `set_muted` |
 | `is_audio()`, `is_hide_download()`, `report()`, `tap()`, `expose()` | defaults | Moloco V2 wires `report`/`tap` to its macro beacons |
 
 `on_game_start` firing immediately by default is not a fudge: on every network
@@ -206,4 +206,5 @@ Since 0.3.15 every bridge carries `is_paused()`, `on_pause(cb)`,
 `luna:pause` / `luna:resume`. Mintegral's `gameClose` does NOT pause — a paused
 ad froze its own end card in production. Late subscribers get the current
 state at once (`on_pause` when already paused, `on_resize` with the current
-size). `set_paused` / `set_size` are container-side; game code only subscribes.
+size). `set_paused` / `set_size` / `set_muted` are container-side; game code only
+subscribes.

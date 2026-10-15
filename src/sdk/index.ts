@@ -72,12 +72,13 @@ function previewStub(): Bridge {
     log_event() {},
     is_audio: () => true,
     is_hide_download: () => false,
-    is_muted: () => false,
+    _muted: false,
+    is_muted() { return this._muted },
     is_game_started: () => true,
     is_paused() { return this._paused },
     on_game_start(cb: Handler) { try { cb() } catch { /* subscriber's problem */ } },
     on_game_close() {},
-    on_mute_change(cb: Handler) { subs.mute.push(cb); try { cb(false) } catch { /* ditto */ } },
+    on_mute_change(cb: Handler) { subs.mute.push(cb); try { cb(this._muted) } catch { /* ditto */ } },
     on_pause(cb: Handler) { subs.pause.push(cb); if (this._paused) { try { cb() } catch { /* ditto */ } } },
     on_resume(cb: Handler) { subs.resume.push(cb) },
     on_resize(cb: Handler) { subs.resize.push(cb); try { cb(window.innerWidth, window.innerHeight) } catch { /* ditto */ } },
@@ -89,6 +90,12 @@ function previewStub(): Bridge {
     },
     set_size(w: number, h: number) {
       for (const fn of subs.resize) { try { fn(w, h) } catch { /* ditto */ } }
+    },
+    set_muted(m: boolean) {
+      m = !!m
+      if (m === this._muted) return
+      this._muted = m
+      for (const fn of subs.mute) { try { fn(m) } catch { /* ditto */ } }
     },
     external_commands: [] as Array<{ name: string; label: string }>,
     expose(name: string, fn: Handler, label?: string) {

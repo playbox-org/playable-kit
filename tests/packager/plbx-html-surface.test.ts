@@ -44,6 +44,7 @@ const REQUIRED_MEMBERS = [
   'on_resize',
   'set_paused',
   'set_size',
+  'set_muted',
 ] as const
 
 /**
@@ -160,6 +161,35 @@ describe('plbx_html surface is identical on every network', () => {
       })
       expect(seen, id).toEqual([false])
     }
+  })
+
+  // set_muted is the container-side setter (Luna's luna:mute, preview hosts
+  // like the Playbox toolbar). Before it existed, on_mute_change fired once
+  // and was dropped, so nothing outside the game could ever mute it.
+  it('set_muted reaches every on_mute_change subscriber', () => {
+    for (const id of ['preview', 'applovin', 'mintegral', 'tiktok', 'luna', 'molocoV2']) {
+      const bridge = bridgeFor(id)
+      const seen: unknown[] = []
+      ;(bridge.on_mute_change as (cb: (m: unknown) => void) => void)((m) => seen.push(m))
+      ;(bridge.set_muted as (m: boolean) => void)(true)
+      ;(bridge.set_muted as (m: boolean) => void)(true)
+      expect((bridge.is_muted as () => boolean)(), id).toBe(true)
+      ;(bridge.set_muted as (m: boolean) => void)(false)
+      expect(seen, id).toEqual([false, true, false])
+    }
+  })
+
+  it('luna:mute / luna:unmute drive set_muted', () => {
+    const listeners: Record<string, () => void> = {}
+    const win = windowFor('luna', {
+      addEventListener: (n: string, f: () => void) => { listeners[n] = f },
+    })
+    const bridge = win.plbx_html as Record<string, (...a: unknown[]) => unknown>
+    const seen: unknown[] = []
+    bridge.on_mute_change((m: unknown) => seen.push(m))
+    listeners['luna:mute']()
+    listeners['luna:unmute']()
+    expect(seen).toEqual([false, true, false])
   })
 
   it('on_pause/on_resize replay current state to a late subscriber', () => {

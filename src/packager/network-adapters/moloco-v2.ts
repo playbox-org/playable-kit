@@ -119,6 +119,7 @@ function setMuted(m) {
   }
 }
 window.plbx_html.is_muted = function() { return _muted; };
+window.plbx_html.set_muted = setMuted;
 window.plbx_html.on_mute_change = function(cb) {
   if (typeof cb !== 'function') return;
   _muteCbs.push(cb);

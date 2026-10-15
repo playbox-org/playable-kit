@@ -1,7 +1,8 @@
 name: Publish
 
-# Publish to npm on a version tag (e.g. `v0.3.0`). Requires the repo secret
-# NPM_TOKEN (an npm automation token for a member of the @playbox-ai org).
+# Publish to npm on a version tag (e.g. `v0.3.0`) via npm trusted publishing
+# (OIDC): the package trusts playbox-org/playable-kit + publish.yml on npmjs.com,
+# so no NPM_TOKEN. Needs npm >= 11.5.1 / Node >= 22.14, hence Node 24.
 on:
   push:
     tags: ['v*']
@@ -20,12 +21,9 @@ jobs:
           version: 10
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: pnpm
+          node-version: 24
           registry-url: https://registry.npmjs.org
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
       # prepublishOnly builds dist; scoped package needs --access public.
       - run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -24,7 +24,7 @@
 | **TikTok** | `window.openAppStore()` | No (forbidden) | **5 MB ZIP** (after compression) | ZIP | none official | high | [TikTok](https://ads.tiktok.com/help/article/playable-ads?lang=en) |
 | **Vungle (Liftoff Monetize)** | `parent.postMessage("download","*")` | No (Adaptive) | **5 MB ZIP** total | ZIP (flat) | init/pause/resume; download+complete | high | [Vungle](https://support.vungle.com/hc/en-us/articles/360056663752-Dos-and-Don-ts-of-Adaptive-Creative) |
 | **AdColony (DT Exchange)** | `mraid.open(url)` | MRAID 2.0 | **No published max**; 2 MB *recommended* for performance (code: 5 MB internal cap) | HTML / ZIP | ready→stateChange→viewableChange; 30 s rewarded | med | [Digital Turbine](https://docs.digitalturbine.com/dt-ads-demand/ad-creative-types/playables) |
-| **Digital Turbine (DT Exchange)** | `mraid.open(url)` (click tracking fires on it) | MRAID 2.0 or plain HTML (MRAID 3.0 not supported) | **No published max**; 2 MB *recommended* (code: 5 MB internal cap) | HTML | DT close after 2 s, custom close ≤ 5 s, fail-safe 15 s | med | [DT Playables](https://docs.digitalturbine.com/dt-ads-demand/ad-creative-types/playables) |
+| **Digital Turbine (DT Exchange)** | `mraid.open(url)` (click tracking fires on it) | MRAID 2.0 or plain HTML (MRAID 3.0 not supported) | **No published max**; 2 MB *recommended* (code: 5 MB internal cap) | HTML | interstitial: DT close 2 s (5 s on other DT pages), fail-safe 15 s; rewarded: 30 s | med | [DT Playables](https://docs.digitalturbine.com/dt-ads-demand/ad-creative-types/playables) |
 | **Chartboost** | `mraid.open(url)` (no `mraid.close()`) | MRAID 2.0 | **3 MB hard**, single bundled HTML | HTML | getState/ready/stateChange/viewableChange | high | [Chartboost](https://docs.chartboost.com/en/advertising/creatives/mraid-playable/) |
 | **Tapjoy (→ Unity Grow)** | `window.TJ_API.click()` | No (own `TJ_API`) | **2 MB**, single Base64 HTML | HTML | TJ_API setPlayableAPI/click/gameplayFinished | med | [Tapjoy PDF](https://tapjoy-docs-production.s3.us-east-2.amazonaws.com/en/support/files/playables-api-v3.0.2.pdf) |
 | **Liftoff (Accelerate)** | `mraid.open()` / `Liftoff.open()` | MRAID (version unspecified) | **< 700 KB (1 MB max) no-video; < 5 MB with video** | HTML/ZIP | mraid `ready`; handle no-`viewableChange` | high | [Liftoff](https://docs.liftoff.io/creative_integration_api) |
@@ -153,15 +153,17 @@ Two official channels (do not conflate — this was a bug in the old doc):
 - **Size:** **No maximum is published.** The current DT Playables page does give a recommendation: "For optimal performance, the recommended file size for Playables is 2 MB." (re-checked 2026-10-15; the 2026-07-01 pass had dropped this figure as unsourced — it is sourced, but it is a hint, not a cap). The kit keeps 5 MB as its internal cap. — [DT Playables](https://docs.digitalturbine.com/dt-ads-demand/ad-creative-types/playables)
 - **Format:** HTML (single MRAID 2.0 doc, assets inline); ZIP with `index.html` (adcolony-ad folder) accepted by build tooling.
 - **MRAID:** 2.0. mraid.js injected by the container SDK — do NOT bundle your own.
-- **Lifecycle:** ready → stateChange → viewableChange; interstitial default close appears after 5 s; **Rewarded Playable = 30 s max**, DT SDK adds a fail-safe Close after 30 s when `useCustomClose()` is detected.
-- **Note:** AdColony as a standalone brand is EOL; specs flow through generic DTX/IAB MRAID docs. Validator: third-party [webtester.mraid.org](http://webtester.mraid.org/) (MRAID 2.0 + Interstitial); no first-party validator.
+- **Lifecycle:** ready → stateChange → viewableChange. Close timings (interstitial vs rewarded): see **Digital Turbine** below — same exchange, one source of truth.
+- **Note:** AdColony as a standalone brand is EOL; specs flow through the DT Exchange docs. Validator: see **Digital Turbine** below.
 
 ### Digital Turbine (DT Exchange) — `med`
-- **Same exchange as AdColony above**, registered as its own target (`digitalturbine`) because briefs name it this way. Both ids produce the same artifact.
-- **Protocol:** "DT Exchange allows Playables that use MRAID 2.0 or HTML ad protocols"; "Playables do not need to be MRAID". MRAID 3.0 is not supported. Interstitial, portrait or landscape. — [DT Playables](https://docs.digitalturbine.com/dt-ads-demand/ad-creative-types/playables)
+- **Same exchange as AdColony above**, registered as its own target (`digitalturbine`) because briefs name it this way. Both ids share one config (`DT_EXCHANGE` in `src/networks.ts`) and produce the same artifact; a parity test keeps them in sync.
+- **Protocol:** "DT Exchange allows Playables that use MRAID 2.0 or HTML ad protocols"; "Playables do not need to be MRAID". Interstitial, portrait or landscape. — [DT Playables](https://docs.digitalturbine.com/dt-ads-demand/ad-creative-types/playables). MRAID 3.0: "VAST and MRAID 3.0 are not currently supported." — [DT Rewarded Playables](https://docs.digitalturbine.com/dt-ads-demand/ad-creative-types/rewarded-playables)
 - **CTA:** `mraid.open(url)` — "The click tracking URL fires on the `mraid.open` event." — [DT MRAID 2.0](https://docs.digitalturbine.com/dt-ads-demand/ad-formats/mraid-2.0)
-- **Size:** 2 MB recommended "for optimal performance"; no maximum published. Kit cap: 5 MB.
-- **Close:** DT shows Close (iOS) / Back (Android) after 2 s; a custom close via `useCustomClose` must appear within 5 s; DT's fail-safe close appears after 15 s if a custom close never shows.
+- **Size:** 2 MB is a *recommendation* "for optimal performance", not a limit; no maximum is published. Kit cap: 5 MB.
+- **Close — interstitial Playable:** DT shows Close (iOS) / Back (Android) after 2 s; a custom close via `useCustomClose` must appear within 5 s; DT's fail-safe close appears after 15 s if a custom close never shows. — [DT Playables](https://docs.digitalturbine.com/dt-ads-demand/ad-creative-types/playables). ⚠ DT's own pages disagree on the default delay: [MRAID 2.0](https://docs.digitalturbine.com/dt-ads-demand/ad-formats/mraid-2.0) ("The default interval is 5 seconds") and [Ad Types](https://docs.digitalturbine.com/dt-exchange/additional-resources/ad-types-and-specification) (Interstitial Display: 5 s) say 5 s. Do not rely on either; the kit does not call `useCustomClose`, so DT's own close is always shown.
+- **Close — Rewarded Playable:** 30 s max; DT shows Close/Back after 30 s, and its fail-safe close also appears after 30 s when `useCustomClose()` is detected. — [DT Rewarded Playables](https://docs.digitalturbine.com/dt-ads-demand/ad-creative-types/rewarded-playables), [Ad Types](https://docs.digitalturbine.com/dt-exchange/additional-resources/ad-types-and-specification)
+- **Validator:** first-party [DT DSP Test App](https://docs.digitalturbine.com/dt-ads-demand/dsp-test-app) ("Creative Tester": upload a mock bid response, check close button, click tracking and MRAID actions on a device). Needs a DT self-service dashboard login ([Demand Web Tool](https://forest.digitalturbine.com/demand)). Without access: third-party [webtester.mraid.org](http://webtester.mraid.org/) (MRAID 2.0 + Interstitial).
 - **End card:** must be part of the creative itself (no SDK-controlled end card).
 
 ### Chartboost — `high`
@@ -374,7 +376,7 @@ The old doc treated the TikTok/Pangle SDK as one interchangeable URL. Verified r
 | Google Ads | https://h5validator.appspot.com/adwords/asset | live, but "does not apply to App campaigns" |
 | Tapjoy | ~~playable.tapjoy.com~~ | **offline (NXDOMAIN)** |
 | Snapchat | Creative Preview Android app (HTTPS) | live |
-| AdColony / Digital Turbine | DT test app (DT's recommendation); third-party webtester.mraid.org | non-official |
+| AdColony / Digital Turbine | [DT DSP Test App](https://docs.digitalturbine.com/dt-ads-demand/dsp-test-app) (Creative Tester; DT dashboard login required); fallback: third-party webtester.mraid.org | official (gated) |
 | TikTok/Pangle, Bigo, GDT, myTarget | in-dashboard / upload-time only | no standalone URL |
 | Appreciate, Appier, Bigabid, Smadex, Rubeex, Nefta, Kwai, NewsBreak | — | ⚠ none / unverified |
 

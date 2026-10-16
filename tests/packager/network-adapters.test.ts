@@ -11,6 +11,7 @@ import {
   FORBIDDEN_STRING_HINTS,
 } from '../../src/networks'
 import { PackageConfig } from '../../src/types'
+import { getNetworkChecks } from '../../src/checks/network-checks'
 
 const sampleHtml = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Game</title></head>
@@ -41,7 +42,9 @@ describe('Network Adapters', () => {
       'unity',
       'ironsource',
       'adcolony',
+      'digitalturbine',
       'appreciate',
+      'appier',
       'chartboost',
       'liftoff',
     ]
@@ -63,6 +66,21 @@ describe('Network Adapters', () => {
         expect(html).toContain('mraid.isViewable')
         expect(html).toContain('viewableChange')
       })
+    })
+
+    it('digitalturbine and adcolony stay one DT Exchange target', () => {
+      // Same exchange under two ids: config, adapter output, forbidden strings
+      // and checks must not drift apart.
+      const strip = ({ id: _id, name: _name, ...rest }: (typeof NETWORKS)[string]) => rest
+      expect(strip(NETWORKS.digitalturbine)).toEqual(strip(NETWORKS.adcolony))
+      const build = (id: string) => {
+        const b = new HtmlBuilder(sampleHtml)
+        getAdapter(id).transform(b, defaultConfig)
+        return b.toHtml().replaceAll(id, 'NET')
+      }
+      expect(build('digitalturbine')).toBe(build('adcolony'))
+      expect(forbiddenStringsFor('digitalturbine')).toEqual(forbiddenStringsFor('adcolony'))
+      expect(getNetworkChecks('digitalturbine', true)).toEqual(getNetworkChecks('adcolony', true))
     })
 
     it('non-MRAID networks should NOT inject __plbx_pre_boot gate', () => {

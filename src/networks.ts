@@ -4,6 +4,21 @@ const MB5 = 5 * 1024 * 1024 // 5242880 bytes
 const MB3 = 3 * 1024 * 1024 // 3145728 bytes
 const MB2 = 2 * 1024 * 1024 // 2097152 bytes
 
+// DT Exchange, shared by `adcolony` (DT's EOL brand) and `digitalturbine` (the
+// name briefs use today) so the two ids cannot drift apart. DT Playables spec:
+// "MRAID 2.0 or HTML ad protocols"; MRAID 3.0 is not supported (Rewarded
+// Playables page); click tracking fires on `mraid.open` (our MRAID bridge).
+// Size: "recommended file size for Playables is 2 MB" is a performance
+// recommendation, not a limit; no maximum is published, so 5 MB is the
+// internal cap. Verified 2026-10-16:
+// https://docs.digitalturbine.com/dt-ads-demand/ad-creative-types/playables
+const DT_EXCHANGE = {
+  format: 'html',
+  maxSize: MB5,
+  mraid: true,
+  inlineAssets: true,
+} satisfies Omit<NetworkConfig, 'id' | 'name'>
+
 export const NETWORKS: Record<string, NetworkConfig> = {
   preview: {
     id: 'preview',
@@ -38,16 +53,8 @@ export const NETWORKS: Record<string, NetworkConfig> = {
     mraid: true,
     inlineAssets: true,
   },
-  adcolony: {
-    id: 'adcolony',
-    name: 'AdColony',
-    format: 'html',
-    // No official DT Exchange / AdColony playable file-size limit is published;
-    // 5 MB is an internal cap (was MB2 — that figure had no source). Verified 2026-07-01.
-    maxSize: MB5,
-    mraid: true,
-    inlineAssets: true,
-  },
+  adcolony: { id: 'adcolony', name: 'AdColony', ...DT_EXCHANGE },
+  digitalturbine: { id: 'digitalturbine', name: 'Digital Turbine (DT Exchange)', ...DT_EXCHANGE },
   tapjoy: {
     id: 'tapjoy',
     name: 'Tapjoy',
@@ -59,6 +66,20 @@ export const NETWORKS: Record<string, NetworkConfig> = {
   appreciate: {
     id: 'appreciate',
     name: 'Appreciate',
+    format: 'html',
+    maxSize: MB5,
+    mraid: true,
+    inlineAssets: true,
+  },
+  appier: {
+    id: 'appier',
+    // Appier (CrossX) is a programmatic DSP: it publishes no playable spec of
+    // its own and serves creatives into the exchanges' MRAID interstitial
+    // inventory. Generic MRAID 2.0 single HTML with a 5 MB cap, the same
+    // placeholder as `appreciate` (the other DSPs differ: bigabid ships a
+    // single-file ZIP, smadex has no MRAID) — unverified, confirm with the
+    // Appier account team. Added 2026-10-15.
+    name: 'Appier',
     format: 'html',
     maxSize: MB5,
     mraid: true,

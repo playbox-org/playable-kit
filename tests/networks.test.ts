@@ -85,6 +85,18 @@ describe('NETWORKS registry', () => {
     expect(inmobi!.inlineAssets).toBe(true)
   })
 
+  it('digitalturbine and appier are single inlined MRAID HTML within 5 MB', () => {
+    // DT Exchange accepts MRAID 2.0 or plain HTML (2 MB is only a performance
+    // recommendation); Appier is a DSP on exchange MRAID inventory.
+    for (const id of ['digitalturbine', 'appier']) {
+      const n = getNetwork(id)!
+      expect(n.format, id).toBe('html')
+      expect(n.mraid, id).toBe(true)
+      expect(n.inlineAssets, id).toBe(true)
+      expect(n.maxSize, id).toBe(5 * 1024 * 1024)
+    }
+  })
+
   it('liftoff should be dualFormat (html + zip)', () => {
     const liftoff = getNetwork('liftoff')
     expect(liftoff!.format).toBe('html')
@@ -105,7 +117,9 @@ describe('NETWORKS registry', () => {
       'unity',
       'ironsource',
       'adcolony',
+      'digitalturbine',
       'appreciate',
+      'appier',
       'chartboost',
       'liftoff',
       'mytarget',

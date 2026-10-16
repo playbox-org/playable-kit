@@ -1,7 +1,7 @@
 # Ad Networks Playable Ads Requirements
 
 > **Status:** Full re-verification pass against official / network-owned sources.
-> **Last verified: 2026-07-01**
+> **Last verified: 2026-07-01** · Digital Turbine and Appier added, DT size note corrected: 2026-10-15
 > **Sources:** Official network docs (re-fetched), Luna Labs, 2DKit, PlayCanvas, archived/Wayback where live pages are gated. Confidence + per-row source links added; unverified networks are flagged explicitly.
 
 **Legend — Confidence:** `high` = core spec backed verbatim by a network-owned source; `med` = network-owned source exists but is partly gated/ambiguous or brand is EOL; `low` = no official playable spec found, values are third-party/generic-MRAID inferences (⚠ unverified).
@@ -23,11 +23,13 @@
 | **Pangle (TikTok)** | `window.openAppStore()` | No (forbidden) | **5 MB ZIP** (after compression) | ZIP | none official | high | [TikTok/Pangle](https://ads.tiktok.com/help/article/how-to-create-tiktok-pangle-playable-ads) |
 | **TikTok** | `window.openAppStore()` | No (forbidden) | **5 MB ZIP** (after compression) | ZIP | none official | high | [TikTok](https://ads.tiktok.com/help/article/playable-ads?lang=en) |
 | **Vungle (Liftoff Monetize)** | `parent.postMessage("download","*")` | No (Adaptive) | **5 MB ZIP** total | ZIP (flat) | init/pause/resume; download+complete | high | [Vungle](https://support.vungle.com/hc/en-us/articles/360056663752-Dos-and-Don-ts-of-Adaptive-Creative) |
-| **AdColony (DT Exchange)** | `mraid.open(url)` | MRAID 2.0 | **No official limit** (code: 5 MB internal cap; ⚠ old 2 MB was fabricated) | HTML / ZIP | ready→stateChange→viewableChange; 30 s rewarded | med | [Digital Turbine](https://docs.digitalturbine.com/dt-exchange/advertisers/ad-formats/mraid-2.0) |
+| **AdColony (DT Exchange)** | `mraid.open(url)` | MRAID 2.0 | **No published max**; 2 MB *recommended* for performance (code: 5 MB internal cap) | HTML / ZIP | ready→stateChange→viewableChange; 30 s rewarded | med | [Digital Turbine](https://docs.digitalturbine.com/dt-ads-demand/ad-creative-types/playables) |
+| **Digital Turbine (DT Exchange)** | `mraid.open(url)` (click tracking fires on it) | MRAID 2.0 or plain HTML (MRAID 3.0 not supported) | **No published max**; 2 MB *recommended* (code: 5 MB internal cap) | HTML | interstitial: DT close 2 s (5 s on other DT pages), fail-safe 15 s; rewarded: 30 s | med | [DT Playables](https://docs.digitalturbine.com/dt-ads-demand/ad-creative-types/playables) |
 | **Chartboost** | `mraid.open(url)` (no `mraid.close()`) | MRAID 2.0 | **3 MB hard**, single bundled HTML | HTML | getState/ready/stateChange/viewableChange | high | [Chartboost](https://docs.chartboost.com/en/advertising/creatives/mraid-playable/) |
 | **Tapjoy (→ Unity Grow)** | `window.TJ_API.click()` | No (own `TJ_API`) | **2 MB**, single Base64 HTML | HTML | TJ_API setPlayableAPI/click/gameplayFinished | med | [Tapjoy PDF](https://tapjoy-docs-production.s3.us-east-2.amazonaws.com/en/support/files/playables-api-v3.0.2.pdf) |
 | **Liftoff (Accelerate)** | `mraid.open()` / `Liftoff.open()` | MRAID (version unspecified) | **< 700 KB (1 MB max) no-video; < 5 MB with video** | HTML/ZIP | mraid `ready`; handle no-`viewableChange` | high | [Liftoff](https://docs.liftoff.io/creative_integration_api) |
 | **Appreciate (DT DSP)** | `mraid.open(url)` ⚠ generic | MRAID 2.0 ⚠ generic | ⚠ no official limit | HTML ⚠ inferred | generic MRAID | low | ⚠ unverified — [appreciate.mobi](https://appreciate.mobi/) has no spec |
+| **Appier (CrossX DSP)** | `mraid.open(url)` ⚠ generic | MRAID 2.0 ⚠ generic | ⚠ no official limit (code: 5 MB) | HTML ⚠ inferred | generic MRAID | low | ⚠ unverified — [appier.com](https://www.appier.com/) publishes no advertiser playable spec |
 | **Snapchat (App Playables)** | `ScPlayableAd.onCTAClick()` | **No mraid.js** | **5 MB uncompressed** (soft) | ZIP (index.html+config.json at root; assets external) | CTA-only | high | [Snapchat](https://businesshelp.snapchat.com/s/article/app-playables?language=en_US) |
 | **Bigo Ads** | `window.BGY_MRAID.open()` (no arg) | No (own SDK v1.13.0) | **< 5 MB ZIP** (after compression) | ZIP (index.html+config.json) | gameReady→GAME_START, GAME_ENDED | high | [Bigo](https://bigoads.com/help/detail?id=144&moduleId=14&currentLan=EN) |
 | **myTarget (VK Ads)** | `MTRG.onCTAClick()` / `FbPlayableAd.onCTAClick()` | No (own API) | **2 MB ZIP** (single base64 HTML) | ZIP | — | high | [VK Ads](https://target.vk.ru/help/advertisers/adformatplayableads/en) |
@@ -148,11 +150,21 @@ Two official channels (do not conflate — this was a bug in the old doc):
 
 ### AdColony (Digital Turbine / DT Exchange) — `med`
 - **CTA:** `mraid.open(url)` — click tracking fires on the `mraid.open` event. Use `mraid.openStoreUrl()` if available. Not `useCustomClose` (that controls the close button). — [DT MRAID 2.0](https://docs.digitalturbine.com/dt-exchange/advertisers/ad-formats/mraid-2.0)
-- **Size:** **No file-size limit OR recommendation is published** in any DT Exchange doc. The old "~2 MB recommended" was fabricated — dropped. Only concrete byte figure anywhere is a 239 KB sample game (2DKit example, not a cap). — [Ad types & spec](https://docs.digitalturbine.com/dt-exchange/publishers/additional-resources/ad-types-and-specification)
+- **Size:** **No maximum is published.** The current DT Playables page does give a recommendation: "For optimal performance, the recommended file size for Playables is 2 MB." (re-checked 2026-10-15; the 2026-07-01 pass had dropped this figure as unsourced — it is sourced, but it is a hint, not a cap). The kit keeps 5 MB as its internal cap. — [DT Playables](https://docs.digitalturbine.com/dt-ads-demand/ad-creative-types/playables)
 - **Format:** HTML (single MRAID 2.0 doc, assets inline); ZIP with `index.html` (adcolony-ad folder) accepted by build tooling.
 - **MRAID:** 2.0. mraid.js injected by the container SDK — do NOT bundle your own.
-- **Lifecycle:** ready → stateChange → viewableChange; interstitial default close appears after 5 s; **Rewarded Playable = 30 s max**, DT SDK adds a fail-safe Close after 30 s when `useCustomClose()` is detected.
-- **Note:** AdColony as a standalone brand is EOL; specs flow through generic DTX/IAB MRAID docs. Validator: third-party [webtester.mraid.org](http://webtester.mraid.org/) (MRAID 2.0 + Interstitial); no first-party validator.
+- **Lifecycle:** ready → stateChange → viewableChange. Close timings (interstitial vs rewarded): see **Digital Turbine** below — same exchange, one source of truth.
+- **Note:** AdColony as a standalone brand is EOL; specs flow through the DT Exchange docs. Validator: see **Digital Turbine** below.
+
+### Digital Turbine (DT Exchange) — `med`
+- **Same exchange as AdColony above**, registered as its own target (`digitalturbine`) because briefs name it this way. Both ids share one config (`DT_EXCHANGE` in `src/networks.ts`) and produce the same artifact; a parity test keeps them in sync.
+- **Protocol:** "DT Exchange allows Playables that use MRAID 2.0 or HTML ad protocols"; "Playables do not need to be MRAID". Interstitial, portrait or landscape. — [DT Playables](https://docs.digitalturbine.com/dt-ads-demand/ad-creative-types/playables). MRAID 3.0: "VAST and MRAID 3.0 are not currently supported." — [DT Rewarded Playables](https://docs.digitalturbine.com/dt-ads-demand/ad-creative-types/rewarded-playables)
+- **CTA:** `mraid.open(url)` — "The click tracking URL fires on the `mraid.open` event." — [DT MRAID 2.0](https://docs.digitalturbine.com/dt-ads-demand/ad-formats/mraid-2.0)
+- **Size:** 2 MB is a *recommendation* "for optimal performance", not a limit; no maximum is published. Kit cap: 5 MB.
+- **Close — interstitial Playable:** DT shows Close (iOS) / Back (Android) after 2 s; a custom close via `useCustomClose` must appear within 5 s; DT's fail-safe close appears after 15 s if a custom close never shows. — [DT Playables](https://docs.digitalturbine.com/dt-ads-demand/ad-creative-types/playables). ⚠ DT's own pages disagree on the default delay: [MRAID 2.0](https://docs.digitalturbine.com/dt-ads-demand/ad-formats/mraid-2.0) ("The default interval is 5 seconds") and [Ad Types](https://docs.digitalturbine.com/dt-exchange/additional-resources/ad-types-and-specification) (Interstitial Display: 5 s) say 5 s. Do not rely on either; the kit does not call `useCustomClose`, so DT's own close is always shown.
+- **Close — Rewarded Playable:** 30 s max; DT shows Close/Back after 30 s, and its fail-safe close also appears after 30 s when `useCustomClose()` is detected. — [DT Rewarded Playables](https://docs.digitalturbine.com/dt-ads-demand/ad-creative-types/rewarded-playables), [Ad Types](https://docs.digitalturbine.com/dt-exchange/additional-resources/ad-types-and-specification)
+- **Validator:** first-party [DT DSP Test App](https://docs.digitalturbine.com/dt-ads-demand/dsp-test-app) ("Creative Tester": upload a mock bid response, check close button, click tracking and MRAID actions on a device). Needs a DT self-service dashboard login ([Demand Web Tool](https://forest.digitalturbine.com/demand)). Without access: third-party [webtester.mraid.org](http://webtester.mraid.org/) (MRAID 2.0 + Interstitial).
+- **End card:** must be part of the creative itself (no SDK-controlled end card).
 
 ### Chartboost — `high`
 - **CTA:** `mraid.open(url)` on CTA click. Never call `mraid.close()` — Chartboost injects its own close button (top-left). — [MRAID playable](https://docs.chartboost.com/en/advertising/creatives/mraid-playable/)
@@ -182,6 +194,10 @@ Two official channels (do not conflate — this was a bug in the old doc):
 - **No Appreciate-owned playable spec exists.** Appreciate is a buy-side programmatic DSP (formerly Triapodi Ltd.), acquired by Digital Turbine (closed 2021-03-02, $22.5M cash + $6.0M bonuses). Creatives are served into third-party exchanges/SSPs and must satisfy the **receiving exchange's** generic IAB MRAID rules.
 - **All fields below are generic-MRAID assumptions, not Appreciate-verified:** size (target well under 5 MB), format HTML, CTA `mraid.open(url)`, MRAID 2.0, gate on `mraid.viewableChange`. — [appreciate.mobi](https://appreciate.mobi/) renders only the word "Appreciate" (no redirect, no spec); parent [DT MRAID 2.0](https://docs.digitalturbine.com/dt-exchange/advertisers/ad-formats/mraid-2.0) covers general MRAID/supply-side only.
 - Do NOT rely on the old "5 MB / HTML / mraid.open" as network-verified.
+
+### Appier (CrossX DSP) — `low` ⚠ unverified
+- **No Appier-owned playable spec is public.** Appier is a programmatic DSP (CrossX); its creatives run on the exchanges' MRAID interstitial inventory and must pass the **receiving exchange's** rules. Appier's own docs (docs.aps.appier.com) cover the publisher SDK only.
+- **Kit values are generic-MRAID assumptions:** single inlined HTML, MRAID 2.0, CTA `mraid.open(url)`, 5 MB cap, boot gated on `viewableChange`. Confirm with the Appier account team before treating them as verified.
 
 ### Snapchat (App Playables) — `high`
 - **CTA:** `ScPlayableAd.onCTAClick()` on CTA tap — Snap injects `window.ScPlayableAd`; NOT MRAID. (Correction: the old `mraid.open(url)` / "MRAID 2.0 / mraid ready" row is WRONG.) Confirmed in code by smoud (`src/core.ts` L478: `ScPlayableAd.onCTAClick()`; `src/protocols.ts` L86-88 detection). — [App Playables](https://businesshelp.snapchat.com/s/article/app-playables?language=en_US), [smoud core.ts](https://raw.githubusercontent.com/smoudjs/playable-sdk/9430aa21f1246e595381962527e465d87751faf5/src/core.ts)
@@ -272,7 +288,7 @@ Two official channels (do not conflate — this was a bug in the old doc):
 
 | Method | Networks |
 |--------|---------|
-| `mraid.open(url)` | AppLovin, Unity, ironSource (MRAID mode), AdColony, Chartboost, Liftoff, InMobi (redirect), Adikteev, Appreciate ⚠, Bigabid ⚠, Smadex ⚠ |
+| `mraid.open(url)` | AppLovin, Unity, ironSource (MRAID mode), AdColony / Digital Turbine, Chartboost, Liftoff, InMobi (redirect), Adikteev, Appreciate ⚠, Appier ⚠, Bigabid ⚠, Smadex ⚠ |
 | `dapi.openStoreUrl()` | ironSource (DAPI mode) |
 | `FbPlayableAd.onCTAClick()` | Facebook/Meta, Moloco, myTarget (alt), InMobi (click-track alt) |
 | `ScPlayableAd.onCTAClick()` | Snapchat |
@@ -294,7 +310,7 @@ Two official channels (do not conflate — this was a bug in the old doc):
 
 | Network | Injected / referenced script | Notes |
 |---------|------------------------------|-------|
-| MRAID networks (AppLovin, Unity, ironSource, AdColony, Chartboost, Liftoff, InMobi, Adikteev, …) | `<script src="mraid.js"></script>` (relative) or none | mraid.js is **container/webview-injected** — no hosted URL to bundle. Unity/InMobi explicitly inject it (Unity: no script tag needed). |
+| MRAID networks (AppLovin, Unity, ironSource, AdColony / Digital Turbine, Chartboost, Liftoff, InMobi, Adikteev, …) | `<script src="mraid.js"></script>` (relative) or none | mraid.js is **container/webview-injected** — no hosted URL to bundle. Unity/InMobi explicitly inject it (Unity: no script tag needed). |
 | Google Ads | `https://tpc.googlesyndication.com/pagead/gadgets/html5/api/exitapi.js` | Literal `<script>` in `<head>`, not JS-injected |
 | **TikTok** | `https://sf16-muse-va.ibytedtos.com/obj/union-fe-nc-i18n/playable/sdk/playable-sdk.js` | Lowercase path confirmed live (HTTP 200, v3.49.0). Bottom of `<body>`, before dev JS |
 | **Pangle** | `https://sf16-muse-va.ibytedtos.com/obj/union-fe-nc-i18n/playable/sdk/playable-sdk.js` | ✅ fixed 2026-07-01 (was stale `pstatp.com` v3.4.1) — see correction below |
@@ -360,9 +376,9 @@ The old doc treated the TikTok/Pangle SDK as one interchangeable URL. Verified r
 | Google Ads | https://h5validator.appspot.com/adwords/asset | live, but "does not apply to App campaigns" |
 | Tapjoy | ~~playable.tapjoy.com~~ | **offline (NXDOMAIN)** |
 | Snapchat | Creative Preview Android app (HTTPS) | live |
-| AdColony | third-party webtester.mraid.org | non-official |
+| AdColony / Digital Turbine | [DT DSP Test App](https://docs.digitalturbine.com/dt-ads-demand/dsp-test-app) (Creative Tester; DT dashboard login required); fallback: third-party webtester.mraid.org | official (gated) |
 | TikTok/Pangle, Bigo, GDT, myTarget | in-dashboard / upload-time only | no standalone URL |
-| Appreciate, Bigabid, Smadex, Rubeex, Nefta, Kwai, NewsBreak | — | ⚠ none / unverified |
+| Appreciate, Appier, Bigabid, Smadex, Rubeex, Nefta, Kwai, NewsBreak | — | ⚠ none / unverified |
 
 ---
 
@@ -408,9 +424,9 @@ Reflects the CURRENT code state as of 2026-07-01. The former `MB4` constant was 
 
 ### ⚠ Unverified networks (leave as TODO / obtain from account contact)
 
-`smadex`, `rubeex`, `nefta`, `kwai`, `newsbreak`, `appreciate`, `bigabid` all carry generic `MB5`/`html`/`zip` placeholders with **no network-owned source** backing them. Do not present their `maxSize`/`format`/`mraid` values as fact:
+`smadex`, `rubeex`, `nefta`, `kwai`, `newsbreak`, `appreciate`, `appier`, `bigabid` all carry generic `MB5`/`html`/`zip` placeholders with **no network-owned source** backing them. Do not present their `maxSize`/`format`/`mraid` values as fact:
 - `nefta` — no playable spec; route through mediation partner (MAX/LevelPlay/AdMob).
 - `kwai` — 5 MB is third-party only; format/CTA/MRAID unknown.
 - `rubeex` — 3rd-party tooling only; Cordova multi-file pkg, not single HTML.
 - `newsbreak` — playable in private beta; no format.
-- `appreciate`, `bigabid`, `smadex` — programmatic DSPs; spec = destination exchange's MRAID rules.
+- `appreciate`, `appier`, `bigabid`, `smadex` — programmatic DSPs; spec = destination exchange's MRAID rules.

@@ -1,7 +1,7 @@
 # Ad Networks Playable Ads Requirements
 
 > **Status:** Full re-verification pass against official / network-owned sources.
-> **Last verified: 2026-07-01** · Digital Turbine and Appier added, DT size note corrected: 2026-10-15
+> **Last verified: 2026-07-01** · Digital Turbine and Appier added, DT size note corrected: 2026-10-15 · RevX added: 2026-10-20
 > **Sources:** Official network docs (re-fetched), Luna Labs, 2DKit, PlayCanvas, archived/Wayback where live pages are gated. Confidence + per-row source links added; unverified networks are flagged explicitly.
 
 **Legend — Confidence:** `high` = core spec backed verbatim by a network-owned source; `med` = network-owned source exists but is partly gated/ambiguous or brand is EOL; `low` = no official playable spec found, values are third-party/generic-MRAID inferences (⚠ unverified).
@@ -30,6 +30,7 @@
 | **Liftoff (Accelerate)** | `mraid.open()` / `Liftoff.open()` | MRAID (version unspecified) | **< 700 KB (1 MB max) no-video; < 5 MB with video** | HTML/ZIP | mraid `ready`; handle no-`viewableChange` | high | [Liftoff](https://docs.liftoff.io/creative_integration_api) |
 | **Appreciate (DT DSP)** | `mraid.open(url)` ⚠ generic | MRAID 2.0 ⚠ generic | ⚠ no official limit | HTML ⚠ inferred | generic MRAID | low | ⚠ unverified — [appreciate.mobi](https://appreciate.mobi/) has no spec |
 | **Appier (CrossX DSP)** | `mraid.open(url)` ⚠ generic | MRAID 2.0 ⚠ generic | ⚠ no official limit (code: 5 MB) | HTML ⚠ inferred | generic MRAID | low | ⚠ unverified — [appier.com](https://www.appier.com/) publishes no advertiser playable spec |
+| **RevX (Affle DSP)** | `mraid.open(url)` ⚠ generic | MRAID 2.0 ⚠ generic (exchanges may host it in a 3.0 container) | ⚠ no official limit (code: 5 MB) | HTML ⚠ inferred | generic MRAID | low | ⚠ unverified — [revx.io](https://revx.io/?p=4990) has playable marketing copy only, no spec |
 | **Snapchat (App Playables)** | `ScPlayableAd.onCTAClick()` | **No mraid.js** | **5 MB uncompressed** (soft) | ZIP (index.html+config.json at root; assets external) | CTA-only | high | [Snapchat](https://businesshelp.snapchat.com/s/article/app-playables?language=en_US) |
 | **Bigo Ads** | `window.BGY_MRAID.open()` (no arg) | No (own SDK v1.13.0) | **< 5 MB ZIP** (after compression) | ZIP (index.html+config.json) | gameReady→GAME_START, GAME_ENDED | high | [Bigo](https://bigoads.com/help/detail?id=144&moduleId=14&currentLan=EN) |
 | **myTarget (VK Ads)** | `MTRG.onCTAClick()` / `FbPlayableAd.onCTAClick()` | No (own API) | **2 MB ZIP** (single base64 HTML) | ZIP | — | high | [VK Ads](https://target.vk.ru/help/advertisers/adformatplayableads/en) |
@@ -197,7 +198,12 @@ Two official channels (do not conflate — this was a bug in the old doc):
 
 ### Appier (CrossX DSP) — `low` ⚠ unverified
 - **No Appier-owned playable spec is public.** Appier is a programmatic DSP (CrossX); its creatives run on the exchanges' MRAID interstitial inventory and must pass the **receiving exchange's** rules. Appier's own docs (docs.aps.appier.com) cover the publisher SDK only.
-- **Kit values are generic-MRAID assumptions:** single inlined HTML, MRAID 2.0, CTA `mraid.open(url)`, 5 MB cap, boot gated on `viewableChange`. Confirm with the Appier account team before treating them as verified.
+- **Kit values are generic-MRAID assumptions:** single inlined HTML, MRAID 2.0, CTA `mraid.open(url)`, 5 MB cap, boot on `isViewable()` or a visible viewport (does not wait for `ready`). Confirm with the Appier account team before treating them as verified.
+
+### RevX (Affle DSP) — `low` ⚠ unverified
+- **No RevX-owned playable spec is public.** RevX (part of Affle since 2019) is a programmatic DSP focused on app retargeting/re-engagement; it has no SDK of its own and buys interstitial inventory on the exchanges, so a creative must pass the **receiving exchange's** MRAID rules. [revx.io](https://revx.io/?p=4990) only has marketing guidance (playables "typically last under a minute", ~20 s ideal, CTA at the end).
+- **Example exchange (Unity Exchange):** `<script src="mraid.js"></script>` early in the ad, wait for `ready` (`getState()` before showing), CTA via `mraid.open(url)`; MRAID 3.0 container, `viewableChange`/`isViewable` deprecated but still supported; no size limit or packaging format stated. — [Unity Exchange playable ads](https://docs.unity.com/en-us/grow/programmatic/unity-exchange/playable-ads)
+- **Kit values are generic-MRAID assumptions** (same as Appier): single inlined HTML, MRAID 2.0 calls, CTA `mraid.open(url)`, 5 MB cap, boot on `isViewable()` or a visible viewport — the gate does **not** wait for `ready` (deliberate: Unity moderation grey-screen fix), while Unity Exchange asks to check `ready` before showing. Confirm format, size and a test placement with the RevX account manager before treating them as verified.
 
 ### Snapchat (App Playables) — `high`
 - **CTA:** `ScPlayableAd.onCTAClick()` on CTA tap — Snap injects `window.ScPlayableAd`; NOT MRAID. (Correction: the old `mraid.open(url)` / "MRAID 2.0 / mraid ready" row is WRONG.) Confirmed in code by smoud (`src/core.ts` L478: `ScPlayableAd.onCTAClick()`; `src/protocols.ts` L86-88 detection). — [App Playables](https://businesshelp.snapchat.com/s/article/app-playables?language=en_US), [smoud core.ts](https://raw.githubusercontent.com/smoudjs/playable-sdk/9430aa21f1246e595381962527e465d87751faf5/src/core.ts)
@@ -288,7 +294,7 @@ Two official channels (do not conflate — this was a bug in the old doc):
 
 | Method | Networks |
 |--------|---------|
-| `mraid.open(url)` | AppLovin, Unity, ironSource (MRAID mode), AdColony / Digital Turbine, Chartboost, Liftoff, InMobi (redirect), Adikteev, Appreciate ⚠, Appier ⚠, Bigabid ⚠, Smadex ⚠ |
+| `mraid.open(url)` | AppLovin, Unity, ironSource (MRAID mode), AdColony / Digital Turbine, Chartboost, Liftoff, InMobi (redirect), Adikteev, Appreciate ⚠, Appier ⚠, RevX ⚠, Bigabid ⚠, Smadex ⚠ |
 | `dapi.openStoreUrl()` | ironSource (DAPI mode) |
 | `FbPlayableAd.onCTAClick()` | Facebook/Meta, Moloco, myTarget (alt), InMobi (click-track alt) |
 | `ScPlayableAd.onCTAClick()` | Snapchat |
@@ -378,7 +384,7 @@ The old doc treated the TikTok/Pangle SDK as one interchangeable URL. Verified r
 | Snapchat | Creative Preview Android app (HTTPS) | live |
 | AdColony / Digital Turbine | [DT DSP Test App](https://docs.digitalturbine.com/dt-ads-demand/dsp-test-app) (Creative Tester; DT dashboard login required); fallback: third-party webtester.mraid.org | official (gated) |
 | TikTok/Pangle, Bigo, GDT, myTarget | in-dashboard / upload-time only | no standalone URL |
-| Appreciate, Appier, Bigabid, Smadex, Rubeex, Nefta, Kwai, NewsBreak | — | ⚠ none / unverified |
+| Appreciate, Appier, RevX, Bigabid, Smadex, Rubeex, Nefta, Kwai, NewsBreak | — | ⚠ none / unverified |
 
 ---
 
@@ -424,9 +430,9 @@ Reflects the CURRENT code state as of 2026-07-01. The former `MB4` constant was 
 
 ### ⚠ Unverified networks (leave as TODO / obtain from account contact)
 
-`smadex`, `rubeex`, `nefta`, `kwai`, `newsbreak`, `appreciate`, `appier`, `bigabid` all carry generic `MB5`/`html`/`zip` placeholders with **no network-owned source** backing them. Do not present their `maxSize`/`format`/`mraid` values as fact:
+`smadex`, `rubeex`, `nefta`, `kwai`, `newsbreak`, `appreciate`, `appier`, `revx`, `bigabid` all carry generic `MB5`/`html`/`zip` placeholders with **no network-owned source** backing them. Do not present their `maxSize`/`format`/`mraid` values as fact:
 - `nefta` — no playable spec; route through mediation partner (MAX/LevelPlay/AdMob).
 - `kwai` — 5 MB is third-party only; format/CTA/MRAID unknown.
 - `rubeex` — 3rd-party tooling only; Cordova multi-file pkg, not single HTML.
 - `newsbreak` — playable in private beta; no format.
-- `appreciate`, `appier`, `bigabid`, `smadex` — programmatic DSPs; spec = destination exchange's MRAID rules.
+- `appreciate`, `appier`, `revx`, `bigabid`, `smadex` — programmatic DSPs; spec = destination exchange's MRAID rules.

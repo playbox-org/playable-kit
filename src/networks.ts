@@ -85,6 +85,22 @@ export const NETWORKS: Record<string, NetworkConfig> = {
     mraid: true,
     inlineAssets: true,
   },
+  revx: {
+    id: 'revx',
+    // RevX (Affle since 2019) is a programmatic DSP for app retargeting: no SDK
+    // and no public playable spec (format, size, MRAID version) — revx.io has
+    // only marketing copy. Its creatives run on the exchanges' MRAID inventory,
+    // e.g. Unity Exchange: mraid.js tag, wait for `ready`, CTA via `mraid.open`
+    // in an MRAID 3.0 container that still serves the 2.0 calls our bridge and
+    // boot gate use. Same generic MRAID single-HTML placeholder at 5 MB as
+    // `appier` — unverified, confirm with the RevX account manager. Added
+    // 2026-10-20.
+    name: 'RevX',
+    format: 'html',
+    maxSize: MB5,
+    mraid: true,
+    inlineAssets: true,
+  },
   chartboost: {
     id: 'chartboost',
     name: 'Chartboost',

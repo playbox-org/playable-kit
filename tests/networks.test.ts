@@ -85,10 +85,10 @@ describe('NETWORKS registry', () => {
     expect(inmobi!.inlineAssets).toBe(true)
   })
 
-  it('digitalturbine and appier are single inlined MRAID HTML within 5 MB', () => {
+  it('digitalturbine, appier and revx are single inlined MRAID HTML within 5 MB', () => {
     // DT Exchange accepts MRAID 2.0 or plain HTML (2 MB is only a performance
-    // recommendation); Appier is a DSP on exchange MRAID inventory.
-    for (const id of ['digitalturbine', 'appier']) {
+    // recommendation); Appier and RevX are DSPs on exchange MRAID inventory.
+    for (const id of ['digitalturbine', 'appier', 'revx']) {
       const n = getNetwork(id)!
       expect(n.format, id).toBe('html')
       expect(n.mraid, id).toBe(true)
@@ -120,6 +120,7 @@ describe('NETWORKS registry', () => {
       'digitalturbine',
       'appreciate',
       'appier',
+      'revx',
       'chartboost',
       'liftoff',
       'mytarget',

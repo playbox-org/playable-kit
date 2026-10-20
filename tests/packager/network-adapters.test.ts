@@ -45,6 +45,7 @@ describe('Network Adapters', () => {
       'digitalturbine',
       'appreciate',
       'appier',
+      'revx',
       'chartboost',
       'liftoff',
     ]

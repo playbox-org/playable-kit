@@ -108,7 +108,7 @@ export function getNetworkChecks(
     checks.push({
       id: 'mraid_ready',
       label: 'MRAID ready',
-      hint: 'mraid.js mock must initialize. Defer-boot gate waits for mraid.getState() === default.',
+      hint: 'mraid.js mock must initialize. Defer-boot gate boots on mraid.isViewable() or a visible viewport; it does not wait for ready.',
     })
     checks.push({
       id: 'viewable_listener',

@@ -59,6 +59,7 @@ import {
 import { extractAxonUsage, validateAxonEvents } from '../validation/axon-events'
 import { extractLunaUsage, validateLunaEvents } from '../validation/luna-events'
 import { buildVersionBanner } from './version-banner'
+import { base64SvgDataUris } from '../validation/data-uri-encoding'
 import CleanCSS from 'clean-css'
 import { KIT_VERSION } from '../version'
 
@@ -107,7 +108,8 @@ export async function packageForNetworks(
   if (!existsSync(htmlPath)) {
     throw new Error(`Build HTML not found: ${htmlPath}`)
   }
-  const baseHtml = readFileSync(htmlPath, 'utf-8')
+  // Vite inlines small SVGs URL-encoded; AppLovin rejects any non-base64 asset.
+  const baseHtml = base64SvgDataUris(readFileSync(htmlPath, 'utf-8'))
 
   const inputKind = detectInputKind(
     new HtmlBuilder(baseHtml),

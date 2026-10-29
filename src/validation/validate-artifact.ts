@@ -10,6 +10,7 @@ import {
   parseRiskyAudioMarker,
 } from './audio-format-check'
 import { scanLoaderHealth } from './loader-health'
+import { findTextDataUris } from './data-uri-encoding'
 import { detectRegionalParams, extractStoreUrls } from './store-url-extractor'
 
 /**
@@ -194,6 +195,18 @@ export function validateArtifact(input: ValidateArtifactInput): CheckResult[] {
         label: 'No WebKit-hostile MP3 (ultra-short VBR/Xing)',
         status: 'warning',
         details: `${IOS_AUDIO_RISK_CTA} Heuristic flagged: ${hostileMp3.join(', ')}`,
+      })
+    }
+
+    // Row only on a hit, like the audio markers: AppLovin rejects any
+    // non-base64 inlined asset; other networks are not known to, so warn.
+    const textUris = findTextDataUris(html)
+    if (textUris.length) {
+      checks.push({
+        id: 'data-uri-encoding',
+        label: 'Inlined assets are base64-encoded',
+        status: input.networkId === 'applovin' ? 'failed' : 'warning',
+        details: `Not base64 (AppLovin rejects these; playable-kit re-encodes SVG on repackage): ${textUris.join(' | ')}`,
       })
     }
 

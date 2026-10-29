@@ -1,7 +1,7 @@
 # Ad Networks Playable Ads Requirements
 
 > **Status:** Full re-verification pass against official / network-owned sources.
-> **Last verified: 2026-07-01** · Digital Turbine and Appier added, DT size note corrected: 2026-10-15 · RevX added: 2026-10-20
+> **Last verified: 2026-07-01** · Digital Turbine and Appier added, DT size note corrected: 2026-10-15 · RevX added: 2026-10-20 · SpinX (Adspin) added: 2026-10-29
 > **Sources:** Official network docs (re-fetched), Luna Labs, 2DKit, PlayCanvas, archived/Wayback where live pages are gated. Confidence + per-row source links added; unverified networks are flagged explicitly.
 
 **Legend — Confidence:** `high` = core spec backed verbatim by a network-owned source; `med` = network-owned source exists but is partly gated/ambiguous or brand is EOL; `low` = no official playable spec found, values are third-party/generic-MRAID inferences (⚠ unverified).
@@ -31,6 +31,7 @@
 | **Appreciate (DT DSP)** | `mraid.open(url)` ⚠ generic | MRAID 2.0 ⚠ generic | ⚠ no official limit | HTML ⚠ inferred | generic MRAID | low | ⚠ unverified — [appreciate.mobi](https://appreciate.mobi/) has no spec |
 | **Appier (CrossX DSP)** | `mraid.open(url)` ⚠ generic | MRAID 2.0 ⚠ generic | ⚠ no official limit (code: 5 MB) | HTML ⚠ inferred | generic MRAID | low | ⚠ unverified — [appier.com](https://www.appier.com/) publishes no advertiser playable spec |
 | **RevX (Affle DSP)** | `mraid.open(url)` ⚠ generic | MRAID 2.0 ⚠ generic (exchanges may host it in a 3.0 container) | ⚠ no official limit (code: 5 MB) | HTML ⚠ inferred | generic MRAID | low | ⚠ unverified — [revx.io](https://revx.io/?p=4990) has playable marketing copy only, no spec |
+| **SpinX (Adspin DSP)** | `mraid.open(url)` ⚠ not stated (standard MRAID) | MRAID 2.0 (interstitials) · 2.0 / 3.0 (rich media) | **2 MB** (interstitials; no playable-specific limit) | HTML ⚠ not stated | container close ≤ 5 s; no audio before a tap (non-rewarded) | med | [Adspin](https://adspin.io/creative-policy) |
 | **Snapchat (App Playables)** | `ScPlayableAd.onCTAClick()` | **No mraid.js** | **5 MB uncompressed** (soft) | ZIP (index.html+config.json at root; assets external) | CTA-only | high | [Snapchat](https://businesshelp.snapchat.com/s/article/app-playables?language=en_US) |
 | **Bigo Ads** | `window.BGY_MRAID.open()` (no arg) | No (own SDK v1.13.0) | **< 5 MB ZIP** (after compression) | ZIP (index.html+config.json) | gameReady→GAME_START, GAME_ENDED | high | [Bigo](https://bigoads.com/help/detail?id=144&moduleId=14&currentLan=EN) |
 | **myTarget (VK Ads)** | `MTRG.onCTAClick()` / `FbPlayableAd.onCTAClick()` | No (own API) | **2 MB ZIP** (single base64 HTML) | ZIP | — | high | [VK Ads](https://target.vk.ru/help/advertisers/adformatplayableads/en) |
@@ -205,6 +206,21 @@ Two official channels (do not conflate — this was a bug in the old doc):
 - **Example exchange (Unity Exchange):** `<script src="mraid.js"></script>` early in the ad, wait for `ready` (`getState()` before showing), CTA via `mraid.open(url)`; MRAID 3.0 container, `viewableChange`/`isViewable` deprecated but still supported; no size limit or packaging format stated. — [Unity Exchange playable ads](https://docs.unity.com/en-us/grow/programmatic/unity-exchange/playable-ads)
 - **Kit values are generic-MRAID assumptions** (same as Appier): single inlined HTML, MRAID 2.0 calls, CTA `mraid.open(url)`, 5 MB cap, boot on `isViewable()` or a visible viewport — the gate does **not** wait for `ready` (deliberate: Unity moderation grey-screen fix), while Unity Exchange asks to check `ready` before showing. Confirm format, size and a test placement with the RevX account manager before treating them as verified.
 
+### SpinX (Adspin DSP) — `med`
+- **Who:** Adspin has three units: **SpinX**, its in-app DSP; Adspin Games, its own apps; and the **Adspin.io Exchange**, which sells those apps' inventory plus direct publishers' to DSPs, directly or via BidSwitch. SpinX creatives run on that exchange, so the source is the exchange's **Creative Approval Policy** v1.0, effective July 2026. — [adspin.io](https://adspin.io/), [creative policy](https://adspin.io/creative-policy)
+- **No playable section** in the policy, so the kit reads a playable as a full-screen interstitial.
+- **Interstitials (§3.2), verbatim:** "Full-screen: 320×480 (portrait), 480×320 (landscape), 1024×768 / 768×1024 (tablet)", "HTML5 MRAID 2.0 compliant", "Max file size: 2 MB", "Must include a clearly visible close button appearing no later than 5 seconds after display".
+- **Rich Media / MRAID (§3.5):** "MRAID 2.0 / 3.0 compliant", no auto-expand and no keyboard without user interaction. The section gives no size, so the 2 MB interstitial cap is the one that applies to a full-screen playable.
+- **Not stated:** CTA call, packaging (single HTML or ZIP), and lifecycle. The kit uses the generic MRAID path: single inlined HTML, `mraid.js`, CTA `mraid.open(url)`, boot on `isViewable()` or a visible viewport.
+- **Close button:** the SDK's close button stays. The kit bridge never calls `useCustomClose`, so the creative does not draw one of its own. A creative that hides the close/exit mechanism is prohibited (§4.5).
+- **Creative rules the config cannot enforce (§4.3, §4.5):**
+  - No audio playback without user interaction on non-rewarded inventory.
+  - No auto-redirects or forced navigation away from the app.
+  - No forced clicks or clickjacking.
+  - No countdown timers that reset or are artificially extended.
+  - DoubleVerify scans 100% of impressions, so a creative that cannot be scanned, or that obfuscates scanning, is blocked.
+- **Kit:** `spinx`, `maxSize: MB2`, `mraid: true`, single inlined HTML. The Unity build is not a drop-in for SpinX: Unity allows 5 MB, Adspin 2 MB. Confidence is `med` because the 2 MB cap and MRAID 2.0 are network-owned, while the format and the "playable = interstitial" reading are inferred.
+
 ### Snapchat (App Playables) — `high`
 - **CTA:** `ScPlayableAd.onCTAClick()` on CTA tap — Snap injects `window.ScPlayableAd`; NOT MRAID. (Correction: the old `mraid.open(url)` / "MRAID 2.0 / mraid ready" row is WRONG.) Confirmed in code by smoud (`src/core.ts` L478: `ScPlayableAd.onCTAClick()`; `src/protocols.ts` L86-88 detection). — [App Playables](https://businesshelp.snapchat.com/s/article/app-playables?language=en_US), [smoud core.ts](https://raw.githubusercontent.com/smoudjs/playable-sdk/9430aa21f1246e595381962527e465d87751faf5/src/core.ts)
 - **Code state (fixed 2026-07-01):** `mraid: false`; `SnapchatAdapter.getPlbxBridge()` → `snapchatBridge()` emits `ScPlayableAd.onCTAClick()`, no mraid.js injected.
@@ -294,7 +310,7 @@ Two official channels (do not conflate — this was a bug in the old doc):
 
 | Method | Networks |
 |--------|---------|
-| `mraid.open(url)` | AppLovin, Unity, ironSource (MRAID mode), AdColony / Digital Turbine, Chartboost, Liftoff, InMobi (redirect), Adikteev, Appreciate ⚠, Appier ⚠, RevX ⚠, Bigabid ⚠, Smadex ⚠ |
+| `mraid.open(url)` | AppLovin, Unity, ironSource (MRAID mode), AdColony / Digital Turbine, Chartboost, Liftoff, InMobi (redirect), Adikteev, Appreciate ⚠, Appier ⚠, RevX ⚠, SpinX (Adspin) ⚠, Bigabid ⚠, Smadex ⚠ |
 | `dapi.openStoreUrl()` | ironSource (DAPI mode) |
 | `FbPlayableAd.onCTAClick()` | Facebook/Meta, Moloco, myTarget (alt), InMobi (click-track alt) |
 | `ScPlayableAd.onCTAClick()` | Snapchat |
@@ -384,6 +400,7 @@ The old doc treated the TikTok/Pangle SDK as one interchangeable URL. Verified r
 | Snapchat | Creative Preview Android app (HTTPS) | live |
 | AdColony / Digital Turbine | [DT DSP Test App](https://docs.digitalturbine.com/dt-ads-demand/dsp-test-app) (Creative Tester; DT dashboard login required); fallback: third-party webtester.mraid.org | official (gated) |
 | TikTok/Pangle, Bigo, GDT, myTarget | in-dashboard / upload-time only | no standalone URL |
+| SpinX (Adspin) | none; DoubleVerify scans every impression | no standalone URL |
 | Appreciate, Appier, RevX, Bigabid, Smadex, Rubeex, Nefta, Kwai, NewsBreak | — | ⚠ none / unverified |
 
 ---

@@ -101,6 +101,23 @@ export const NETWORKS: Record<string, NetworkConfig> = {
     mraid: true,
     inlineAssets: true,
   },
+  spinx: {
+    id: 'spinx',
+    // SpinX is Adspin's in-app DSP; its creatives run on the Adspin.io Exchange
+    // (Adspin Games' own apps plus direct publishers). The exchange's Creative
+    // Approval Policy has no playable section; a playable runs as a full-screen
+    // interstitial, and those must be "HTML5 MRAID 2.0 compliant" with "Max
+    // file size: 2 MB" (§3.2). The close button is the container's (within
+    // 5 s), and the bridge never calls useCustomClose. Not in the config: no
+    // audio before a user tap on non-rewarded inventory, and DoubleVerify scans
+    // every creative (§4.5). Verified 2026-10-29:
+    // https://adspin.io/creative-policy
+    name: 'SpinX (Adspin)',
+    format: 'html',
+    maxSize: MB2,
+    mraid: true,
+    inlineAssets: true,
+  },
   chartboost: {
     id: 'chartboost',
     name: 'Chartboost',

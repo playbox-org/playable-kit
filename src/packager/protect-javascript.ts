@@ -39,7 +39,8 @@ export function protectJavaScript(source: string, module = false): string {
     reservedStrings: ['^data:', '^https?://'],
     sourceMap: false,
   }).getObfuscatedCode()
-  return [...licenses].map(text => `/*${text}*/\n`).join('') + protectedCode.replace(/<\/script/gi, '<\\/script')
+  return ([...licenses].map(text => `/*${text}*/\n`).join('') + protectedCode)
+    .replace(/<\/script/gi, '<\\/script')
 }
 
 export function protectPlayableHtml(html: string, deferBoot = false): string {

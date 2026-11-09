@@ -6,14 +6,21 @@ import * as cheerio from 'cheerio'
 import { rewriteCocosJs, shouldRewriteCocosJs } from './cocos-js-rewriter'
 
 export function protectJavaScript(source: string, module = false): string {
+  const licenses = new Set<string>()
   const { code } = minify_sync(source, {
     module,
     compress: true,
     mangle: true,
-    format: { comments: false, inline_script: true },
+    format: {
+      comments: (_node, comment) => {
+        if (/^!|@license|@preserve|@cc_on/i.test(comment.value)) licenses.add(comment.value)
+        return false
+      },
+      inline_script: true,
+    },
   })
   if (!code) return ''
-  return JavaScriptObfuscator.obfuscate(code, {
+  const protectedCode = JavaScriptObfuscator.obfuscate(code, {
     target: 'browser-no-eval',
     compact: true,
     seed: 603,
@@ -31,7 +38,8 @@ export function protectJavaScript(source: string, module = false): string {
     // Keep assets compact and network scanners able to find store URLs.
     reservedStrings: ['^data:', '^https?://'],
     sourceMap: false,
-  }).getObfuscatedCode().replace(/<\/script/gi, '<\\/script')
+  }).getObfuscatedCode()
+  return [...licenses].map(text => `/*${text}*/\n`).join('') + protectedCode.replace(/<\/script/gi, '<\\/script')
 }
 
 export function protectPlayableHtml(html: string, deferBoot = false): string {

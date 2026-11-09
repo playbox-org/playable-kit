@@ -48,6 +48,7 @@ it('minifies private names and escapes strings without dynamic code or corruptin
   runInNewContext(code, { window }, { contextCodeGeneration: { strings: false, wasm: false } })
   expect(window).toMatchObject({ result: '7Merge moon gems', unicode: '\u2603', close: '</script>' })
   expect(protectJavaScript(source)).toBe(code)
+  expect(protectJavaScript('/*! Engine license MIT */\n' + source)).toContain('/*! Engine license MIT */')
   expect(() => protectJavaScript('const broken = ;')).toThrow()
   const document = protectPlayableHtml(`${html}<script type="application/json">{"label":"data"}</script>`)
   expect(document).toContain('{"label":"data"}')

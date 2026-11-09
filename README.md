@@ -52,7 +52,7 @@ alongside `--splash` / `showSplash: true`.
 `packageForNetworks` and `playable-kit package` always minify and obfuscate game
 JavaScript, including inline scripts, loader ZIP members and plain-ZIP scripts.
 The input build is untouched; shipped source maps and source-map comments are
-removed. `protectPlayableHtml(html)` applies the same transform to an intermediate
+removed. License/preserve comments remain. `protectPlayableHtml(html)` applies the same transform to an intermediate
 self-contained preview without adding a network bridge.
 
 Terser removes dead code and shortens private identifiers; javascript-obfuscator

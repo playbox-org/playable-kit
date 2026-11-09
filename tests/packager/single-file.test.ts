@@ -1,6 +1,7 @@
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import JSZip from 'jszip'
+import { load } from 'cheerio'
 import { afterAll, describe, expect, it } from 'vitest'
 import { packageForNetworks } from '../../src/packager/packager'
 import { detectInputKind, unreferencedBuildFiles } from '../../src/packager/single-file'
@@ -122,7 +123,7 @@ describe('single-file packaging — every network', () => {
       expect(html, r.networkId).not.toContain('crossorigin')
       expect(html, r.networkId).not.toContain('__plbx_zip')
       const bridgeAt = html.indexOf('window.plbx_html = window.plbx_html ||')
-      const source = readFileSync(join(BUILD, 'index.html'), 'utf8').match(/<script[^>]*>([\s\S]*?)<\/script>/)![1]
+      const source = load(readFileSync(join(BUILD, 'index.html'), 'utf8'))('script').first().text()
       const bundleAt = html.indexOf(protectJavaScript(source, true))
       expect(bridgeAt, r.networkId).toBeGreaterThan(-1)
       expect(bundleAt, r.networkId).toBeGreaterThan(bridgeAt)
@@ -193,7 +194,7 @@ describe('single-file packaging — every network', () => {
     const r = result.results[0]
     expect(r.secondaryPath).toBeDefined()
     const payload = readFileSync(r.secondaryPath!, 'utf-8')
-    const source = readFileSync(join(BUILD, 'index.html'), 'utf8').match(/<script[^>]*>([\s\S]*?)<\/script>/)![1]
+    const source = load(readFileSync(join(BUILD, 'index.html'), 'utf8'))('script').first().text()
     expect(payload).toContain(JSON.stringify(protectJavaScript(source, true)).slice(1, -1))
     expect(payload).not.toContain('__plbx_zip')
     expect(getNetwork('molocoV2')!.launcherPayload!.launcherMaxSize).toBe(3 * 1024)

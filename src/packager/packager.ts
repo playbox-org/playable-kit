@@ -45,7 +45,7 @@ import {
   validateLauncher,
   effectiveLauncherBytes,
 } from './launcher-builder'
-import { resolveTemplate } from './template-resolver'
+import { assertSafeOutputPaths, resolveOutputPath } from './output-paths'
 import {
   extractStoreUrls,
   detectRegionalParams,
@@ -101,6 +101,7 @@ function resolvePackagerVersion(explicit?: string): string {
 export async function packageForNetworks(
   options: PackagerOptions,
 ): Promise<PackagerResult> {
+  assertSafeOutputPaths(options)
   const startTime = Date.now()
   const results: PackageResult[] = []
 
@@ -552,15 +553,7 @@ export async function packageForNetworks(
         let pushed = false
 
         // Resolve output path from template
-        const template = options.outputTemplate || '{networkId}/index.{ext}'
-        const resolved = resolveTemplate(template, {
-          network: network.id,
-          networkId: network.id,
-          format,
-          ext: format,
-          ...options.templateVariables,
-        })
-        outputPath = join(options.outputDir, resolved)
+        outputPath = resolveOutputPath(options, network.id, format)
         mkdirSync(dirname(outputPath), { recursive: true })
 
         // Determine if this format needs a fully-inlined single HTML.

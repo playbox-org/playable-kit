@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
+import { mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { runInNewContext, Script } from 'vm'
@@ -6,7 +6,7 @@ import { load } from 'cheerio'
 import JSZip from 'jszip'
 // @ts-expect-error jsdom is a test-only dependency without declarations.
 import { JSDOM } from 'jsdom'
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it, vi } from 'vitest'
 import { NETWORKS } from '../../src/networks'
 import { packageForNetworks } from '../../src/packager/packager'
 import { protectJavaScript, protectPlayableHtml } from '../../src/packager/protect-javascript'
@@ -123,6 +123,45 @@ it('retains every readable input byte and private repack member alongside protec
         expect(await repack.file(path)!.async('nodebuffer'), path).toEqual(original[path])
       }
     }
+  }
+})
+
+it('rejects overlapping outputs before any writes or progress, including a later target', async () => {
+  for (const scenario of ['direct', 'nested', 'later', 'alias', 'template', 'staging', 'file-alias']) {
+    const input = workspace()
+    const root = join(input.buildDir, '..')
+    mkdirSync(join(input.buildDir, 'assets'))
+    writeFileSync(join(input.buildDir, 'assets', 'index.html'), html)
+    symlinkSync(input.buildDir, join(root, 'alias'), 'dir')
+    const snapshot = () => Object.fromEntries(
+      (readdirSync(root, { recursive: true }) as string[]).sort()
+        .map(path => [path, statSync(join(root, path)).isFile() ? readFileSync(join(root, path)) : null]),
+    )
+    const onProgress = vi.fn()
+    const outputDir = scenario === 'alias' ? join(root, 'alias')
+      : scenario === 'nested' ? join(input.buildDir, 'assets')
+      : scenario === 'template' || scenario === 'file-alias' ? input.outputDir : input.buildDir
+    const outputTemplate = scenario === 'later' ? '{networkId}/index.{ext}'
+      : scenario === 'template' ? '../build/index.{ext}' : 'index.{ext}'
+    const networks = scenario === 'later' ? ['applovin', 'yandex'] : ['applovin']
+    if (scenario === 'later') {
+      mkdirSync(join(input.buildDir, 'yandex'))
+      writeFileSync(join(input.buildDir, 'yandex', 'source.js'), game)
+    }
+    if (scenario === 'staging') {
+      mkdirSync(join(input.buildDir, '_temp_yandex'))
+      writeFileSync(join(input.buildDir, '_temp_yandex', 'source.js'), game)
+      networks[0] = 'yandex'
+    }
+    if (scenario === 'file-alias') {
+      mkdirSync(input.outputDir)
+      symlinkSync(join(input.buildDir, 'index.html'), join(input.outputDir, 'index.html'))
+    }
+    const expected = snapshot()
+    await expect(packageForNetworks({ ...input, outputDir, outputTemplate, networks, onProgress }))
+      .rejects.toThrow(/output.*overlap.*input build/i)
+    expect(onProgress).not.toHaveBeenCalled()
+    expect(snapshot()).toEqual(expected)
   }
 })
 

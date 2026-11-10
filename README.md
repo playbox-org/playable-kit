@@ -51,11 +51,15 @@ alongside `--splash` / `showSplash: true`.
 
 `packageForNetworks` and `playable-kit package` always minify and obfuscate game
 JavaScript, including inline scripts, loader ZIP members and plain-ZIP scripts.
-With separate, non-overlapping input and output paths, the readable input build
-is untouched, including JavaScript, source maps and nested assets. The caller
+The readable input files remain untouched, including JavaScript, source maps
+and nested assets. The caller
 keeps `buildDir` and receives protected artifacts at each result's `outputPath`
-(and `secondaryPath` when present). Keep `outputDir` and resolved output-template
-paths outside `buildDir`; the packager does not guard against overlapping paths.
+(and `secondaryPath` when present). Before any writes or progress callbacks, all
+resolved output parents are checked for input overlap. A parent at/above the
+build, or a populated parent inside it, is rejected with an error. Fresh/empty
+nested output directories remain supported; repeat packaging needs an empty/new
+nested directory or output outside the build. This conservative check also covers
+renamed archives, secondary outputs and staging cleanup.
 Shipped source maps and source-map comments are removed. License/preserve comments
 remain. `protectPlayableHtml(html)` applies the same transform to an intermediate
 self-contained preview without adding a network bridge.

@@ -25,11 +25,17 @@ JSZip bundles **pako** (zlib port):
 
 ## Runtime dependencies (installed from npm, not vendored)
 
+Terser and javascript-obfuscator run only during packaging. Their licenses are
+included in their npm distributions; neither library is injected into playables.
+Existing game-bundle license notices remain in the protected output.
+
 | Package   | Version range | License                           |
 | --------- | ------------- | --------------------------------- |
 | jszip     | ^3.10.0       | MIT (dual MIT/GPLv3; MIT elected) |
 | cheerio   | ^1.0.0        | MIT                               |
 | clean-css | ^5.3.0        | MIT                               |
+| terser | 5.46.0 | BSD-2-Clause |
+| javascript-obfuscator | 4.2.1 | BSD-2-Clause |
 
 All of the above are permissive and compatible with distributing this package
 under Apache-2.0. If additional dependencies are added, extend this file before

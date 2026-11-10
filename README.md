@@ -51,9 +51,19 @@ alongside `--splash` / `showSplash: true`.
 
 `packageForNetworks` and `playable-kit package` always minify and obfuscate game
 JavaScript, including inline scripts, loader ZIP members and plain-ZIP scripts.
-The input build is untouched; shipped source maps and source-map comments are
-removed. License/preserve comments remain. `protectPlayableHtml(html)` applies the same transform to an intermediate
+With separate, non-overlapping input and output paths, the readable input build
+is untouched, including JavaScript, source maps and nested assets. The caller
+keeps `buildDir` and receives protected artifacts at each result's `outputPath`
+(and `secondaryPath` when present). Keep `outputDir` and resolved output-template
+paths outside `buildDir`; the packager does not guard against overlapping paths.
+Shipped source maps and source-map comments are removed. License/preserve comments
+remain. `protectPlayableHtml(html)` applies the same transform to an intermediate
 self-contained preview without adding a network bridge.
+
+Protection is for network exports, client previews and hosting, not source
+storage. Platform integrations must retain readable code in S3 Code files, the
+agent workspace, edit versions and staff views, and deliver only the protected
+rendition to clients. Packaging does not replace that retained source.
 
 Terser removes dead code and shortens private identifiers; javascript-obfuscator
 escapes strings with `browser-no-eval`. No string decoder, control-flow
@@ -65,7 +75,8 @@ Sizes and `withinLimit` describe the protected bytes, not the input.
 
 This is copy friction, not encryption: a browser can always recover executed
 JavaScript. The private `plbx` repack archive deliberately retains its original
-`build.zip`; it is not a client delivery artifact. Mobile FPS and acceptance by
+`build.zip`, with the original file inventory and bytes (including source maps).
+That archive is private repack input, never a client export. Mobile FPS and acceptance by
 network upload services still require testing on the actual creative.
 
 ## Lifecycle globals — check the direction first

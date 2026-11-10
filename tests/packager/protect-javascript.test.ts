@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
+import { mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { runInNewContext, Script } from 'vm'
@@ -79,6 +79,51 @@ it('ships protected, valid HTML/ZIP/payload artifacts for every target, keeping 
     }
   }
   expect(readFileSync(join(input.buildDir, 'index.html'), 'utf8')).toBe(html)
+})
+
+it('retains every readable input byte and private repack member alongside protected releases', async () => {
+  const input = workspace(html.replace('</body>', '<script src="main.js"></script></body>'))
+  writeFileSync(join(input.buildDir, 'main.js'), game + '\n//# sourceMappingURL=main.js.map')
+  writeFileSync(join(input.buildDir, 'main.js.map'), JSON.stringify({ sourcesContent: [game] }))
+  mkdirSync(join(input.buildDir, 'assets'))
+  writeFileSync(join(input.buildDir, 'assets', 'pixel.bin'), Buffer.from([0, 128, 255]))
+  const snapshot = () => Object.fromEntries(
+    (readdirSync(input.buildDir, { recursive: true }) as string[]).sort()
+      .filter(path => statSync(join(input.buildDir, path)).isFile())
+      .map(path => [path, readFileSync(join(input.buildDir, path))]),
+  )
+  const original = snapshot()
+  const { results } = await packageForNetworks({ ...input, networks: ['applovin', 'yandex', 'plbx'] })
+  expect(results.map(result => [result.networkId, result.format])).toEqual([
+    ['applovin', 'html'], ['yandex', 'zip'], ['plbx', 'zip'],
+  ])
+  expect(snapshot()).toEqual(original)
+
+  for (const result of results) {
+    expect(result.outputPath).not.toBe('')
+    const output = readFileSync(result.outputPath)
+    expect(output).not.toEqual(original['index.html'])
+    const archive = result.format === 'zip' ? await JSZip.loadAsync(output) : null
+    const document = archive
+      ? await archive.file(result.networkId === 'plbx' ? 'source.html' : 'index.html')!.async('string')
+      : output.toString('utf8')
+    expect(document).not.toMatch(/mergeMoonGems|Merge moon gems|Design notes|sourceMappingURL/)
+    const encoded = document.match(/window\.__plbx_zip = "([^"]+)"/)
+    const scripts = encoded ? await JSZip.loadAsync(Buffer.from(encoded[1], 'base64')) : archive!
+    expect(Object.keys(scripts.files)).not.toContain('main.js.map')
+    const releaseScript = await scripts.file(result.networkId === 'yandex' ? 'res.js' : 'main.js')!.async('nodebuffer')
+    expect(releaseScript).not.toEqual(original['main.js'])
+    expect(releaseScript.toString('utf8')).not.toMatch(/mergeMoonGems|Merge moon gems|Design notes|sourceMappingURL/)
+
+    if (result.networkId === 'plbx') {
+      const repack = await JSZip.loadAsync(await archive!.file('build.zip')!.async('nodebuffer'))
+      const members = Object.keys(repack.files).filter(path => !repack.files[path].dir).sort()
+      expect(members).toEqual(Object.keys(original))
+      for (const path of members) {
+        expect(await repack.file(path)!.async('nodebuffer'), path).toEqual(original[path])
+      }
+    }
+  }
 })
 
 it('keeps the preview playable and MRAID CTA working with dynamic code disabled', async () => {

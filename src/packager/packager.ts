@@ -18,7 +18,6 @@ import {
   NETWORKS,
   maxSizeForFormat,
   FORBIDDEN_STRING_HINTS,
-  forbiddenStringsFor,
   type ForbiddenPattern,
 } from '../networks'
 import {
@@ -29,6 +28,7 @@ import {
 } from '../types'
 import { PackagerOptions, PackagerResult } from './types'
 import { packDirectoryToZip } from './asset-inliner'
+import { rewriteCocosJs, shouldRewriteCocosJs } from './cocos-js-rewriter'
 import {
   generateFullHtml,
   generatePayloadJs,
@@ -45,7 +45,7 @@ import {
   validateLauncher,
   effectiveLauncherBytes,
 } from './launcher-builder'
-import { assertSafeOutputPaths, resolveOutputPath } from './output-paths'
+import { resolveTemplate } from './template-resolver'
 import {
   extractStoreUrls,
   detectRegionalParams,
@@ -62,7 +62,6 @@ import { buildVersionBanner } from './version-banner'
 import { base64SvgDataUris } from '../validation/data-uri-encoding'
 import CleanCSS from 'clean-css'
 import { KIT_VERSION } from '../version'
-import { createScriptProtector, forbiddenBuildStrings, protectBuildDirectory, protectPlayableHtml } from './protect-javascript'
 
 /** Substring that identifies a usable Google Play Store URL (what Unity's
  *  Creative Pack validator greps the raw HTML for). */
@@ -101,7 +100,6 @@ function resolvePackagerVersion(explicit?: string): string {
 export async function packageForNetworks(
   options: PackagerOptions,
 ): Promise<PackagerResult> {
-  assertSafeOutputPaths(options)
   const startTime = Date.now()
   const results: PackageResult[] = []
 
@@ -136,14 +134,6 @@ export async function packageForNetworks(
       console.warn(`[plbx] ${w}`)
     }
   }
-
-  const protectedHtml = protectPlayableHtml(baseHtml)
-  const protectedLoaderHtml = inputKind === 'loader' ? protectPlayableHtml(baseHtml, true) : protectedHtml
-  const protectScript = createScriptProtector()
-  const forbiddenSource = forbiddenBuildStrings(
-    options.buildDir,
-    [...new Set(options.networks.flatMap(forbiddenStringsFor))],
-  ).join('\n')
 
   // Optional client splash logo — read once, shared across networks. Unreadable
   // path / unsupported type falls back to the default PLBX splash (no hard fail).
@@ -265,11 +255,6 @@ export async function packageForNetworks(
       }
 
       const adapter = getAdapter(networkId)
-      assertNoForbiddenStrings(
-        forbiddenSource,
-        adapter.getForbiddenStrings(),
-        network.name,
-      )
 
       // Only the luna and plbx targets see the resolved store URLs / appName
       // above (luna.json and plbx.json carry them). Every other network is
@@ -281,11 +266,7 @@ export async function packageForNetworks(
           : options.config
 
       // Clone HTML and apply network adapter
-      const builder = new HtmlBuilder(
-        network.format === 'html' || network.format === 'launcher-payload' || network.singleFileZip
-          ? protectedLoaderHtml
-          : protectedHtml,
-      )
+      const builder = new HtmlBuilder(baseHtml)
       adapter.transform(builder, packageConfig)
 
       // Startup version banner + plaintext store-URL <head> comments (super-html parity).
@@ -436,8 +417,13 @@ export async function packageForNetworks(
                 originalHtml: builder.toHtml(),
                 zipBase64: (
                   await packDirectoryToZip(options.buildDir, undefined, {
-                    excludeExtensions: ['.css', '.html', '.map'],
-                    transform: (path, content) => protectScript(path, content, launcherSelfContained),
+                    excludeExtensions: ['.css', '.html'],
+                    transform: (path, content) =>
+                      shouldRewriteCocosJs(path)
+                        ? rewriteCocosJs(content.toString('utf-8'), {
+                            selfContained: launcherSelfContained,
+                          })
+                        : null,
                   })
                 ).toString('base64'),
                 cssContent: extractAndMinifyCss(options.buildDir),
@@ -553,7 +539,15 @@ export async function packageForNetworks(
         let pushed = false
 
         // Resolve output path from template
-        outputPath = resolveOutputPath(options, network.id, format)
+        const template = options.outputTemplate || '{networkId}/index.{ext}'
+        const resolved = resolveTemplate(template, {
+          network: network.id,
+          networkId: network.id,
+          format,
+          ext: format,
+          ...options.templateVariables,
+        })
+        outputPath = join(options.outputDir, resolved)
         mkdirSync(dirname(outputPath), { recursive: true })
 
         // Determine if this format needs a fully-inlined single HTML.
@@ -602,8 +596,13 @@ export async function packageForNetworks(
               options.buildDir,
               undefined,
               {
-                excludeExtensions: ['.css', '.html', '.map'],
-                transform: (path, content) => protectScript(path, content, selfContained),
+                excludeExtensions: ['.css', '.html'],
+                transform: (path, content) =>
+                  shouldRewriteCocosJs(path)
+                    ? rewriteCocosJs(content.toString('utf-8'), {
+                        selfContained,
+                      })
+                    : null,
               },
             )
             zipBase64 = zipBuffer.toString('base64')
@@ -782,7 +781,6 @@ export async function packageForNetworks(
           mkdirSync(tempDir, { recursive: true })
 
           cpSync(options.buildDir, tempDir, { recursive: true })
-          protectBuildDirectory(tempDir)
           const zipBranchHtml = builder.toHtml()
           assertNoForbiddenStrings(
             zipBranchHtml,

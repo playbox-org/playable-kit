@@ -46,6 +46,7 @@ describe('Network Adapters', () => {
       'appreciate',
       'appier',
       'revx',
+      'spinx',
       'chartboost',
       'liftoff',
     ]

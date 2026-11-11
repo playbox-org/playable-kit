@@ -97,6 +97,16 @@ describe('NETWORKS registry', () => {
     }
   })
 
+  it('spinx is single inlined MRAID HTML within 2 MB', () => {
+    // SpinX runs on the Adspin.io Exchange, policy §3.2: full-screen
+    // interstitials are HTML5 MRAID 2.0, max 2 MB.
+    const n = getNetwork('spinx')!
+    expect(n.format).toBe('html')
+    expect(n.mraid).toBe(true)
+    expect(n.inlineAssets).toBe(true)
+    expect(n.maxSize).toBe(2 * 1024 * 1024)
+  })
+
   it('liftoff should be dualFormat (html + zip)', () => {
     const liftoff = getNetwork('liftoff')
     expect(liftoff!.format).toBe('html')
@@ -121,6 +131,7 @@ describe('NETWORKS registry', () => {
       'appreciate',
       'appier',
       'revx',
+      'spinx',
       'chartboost',
       'liftoff',
       'mytarget',

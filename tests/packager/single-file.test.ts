@@ -1,7 +1,6 @@
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import JSZip from 'jszip'
-import { load } from 'cheerio'
 import { afterAll, describe, expect, it } from 'vitest'
 import { packageForNetworks } from '../../src/packager/packager'
 import { detectInputKind, unreferencedBuildFiles } from '../../src/packager/single-file'
@@ -9,7 +8,6 @@ import { HtmlBuilder } from '../../src/packager/html-builder'
 import { NETWORKS, getNetwork, maxSizeForFormat } from '../../src/networks'
 import { getAdapter } from '../../src/packager/network-adapters'
 import { validateArtifact } from '../../src/validation/validate-artifact'
-import { protectJavaScript } from '../../src/packager/protect-javascript'
 
 const FIXTURES = join(__dirname, '../fixtures')
 const BUILD = join(FIXTURES, 'single-file-build')
@@ -123,8 +121,7 @@ describe('single-file packaging — every network', () => {
       expect(html, r.networkId).not.toContain('crossorigin')
       expect(html, r.networkId).not.toContain('__plbx_zip')
       const bridgeAt = html.indexOf('window.plbx_html = window.plbx_html ||')
-      const source = load(readFileSync(join(BUILD, 'index.html'), 'utf8'))('script').first().text()
-      const bundleAt = html.indexOf(protectJavaScript(source, true))
+      const bundleAt = html.indexOf('window.__fixture=')
       expect(bridgeAt, r.networkId).toBeGreaterThan(-1)
       expect(bundleAt, r.networkId).toBeGreaterThan(bridgeAt)
       // network SDK tags (TikTok) precede the bundle
@@ -194,8 +191,7 @@ describe('single-file packaging — every network', () => {
     const r = result.results[0]
     expect(r.secondaryPath).toBeDefined()
     const payload = readFileSync(r.secondaryPath!, 'utf-8')
-    const source = load(readFileSync(join(BUILD, 'index.html'), 'utf8'))('script').first().text()
-    expect(payload).toContain(JSON.stringify(protectJavaScript(source, true)).slice(1, -1))
+    expect(payload).toContain('window.__fixture=')
     expect(payload).not.toContain('__plbx_zip')
     expect(getNetwork('molocoV2')!.launcherPayload!.launcherMaxSize).toBe(3 * 1024)
     // No second splash: the launcher already renders its own

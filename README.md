@@ -47,42 +47,6 @@ The PLBX loading splash is off by default on both packaging paths. Opt in with
 <path>` / `customSplashLogo` swaps in a client logo but only takes effect
 alongside `--splash` / `showSplash: true`.
 
-## Release JavaScript protection
-
-`packageForNetworks` and `playable-kit package` always minify and obfuscate game
-JavaScript, including inline scripts, loader ZIP members and plain-ZIP scripts.
-The readable input files remain untouched, including JavaScript, source maps
-and nested assets. The caller
-keeps `buildDir` and receives protected artifacts at each result's `outputPath`
-(and `secondaryPath` when present). Before any writes or progress callbacks, all
-resolved output parents are checked for input overlap. A parent at/above the
-build, or a populated parent inside it, is rejected with an error. Fresh/empty
-nested output directories remain supported; repeat packaging needs an empty/new
-nested directory or output outside the build. This conservative check also covers
-renamed archives, secondary outputs and staging cleanup.
-Shipped source maps and source-map comments are removed. License/preserve comments
-remain. `protectPlayableHtml(html)` applies the same transform to an intermediate
-self-contained preview without adding a network bridge.
-
-Protection is for network exports, client previews and hosting, not source
-storage. Platform integrations must retain readable code in S3 Code files, the
-agent workspace, edit versions and staff views, and deliver only the protected
-rendition to clients. Packaging does not replace that retained source.
-
-Terser removes dead code and shortens private identifiers; javascript-obfuscator
-escapes strings with `browser-no-eval`. No string decoder, control-flow
-flattening, self-defending code or anti-debug timer is added. Global entry points,
-property names, data URIs and network-scannable URLs retain their contracts.
-Network bridges remain readable so static validators can check SDK wiring;
-forbidden source strings are checked before protection as well as afterward.
-Sizes and `withinLimit` describe the protected bytes, not the input.
-
-This is copy friction, not encryption: a browser can always recover executed
-JavaScript. The private `plbx` repack archive deliberately retains its original
-`build.zip`, with the original file inventory and bytes (including source maps).
-That archive is private repack input, never a client export. Mobile FPS and acceptance by
-network upload services still require testing on the actual creative.
-
 ## Lifecycle globals — check the direction first
 
 ⚠️ A `game*` global's **name does not tell you who calls it**, and the same

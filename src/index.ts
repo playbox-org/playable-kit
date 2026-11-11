@@ -8,7 +8,6 @@ export {
   resolveSplashLogoDataUrl,
 } from './packager/packager'
 export type { PackagerOptions, PackagerResult } from './packager/types'
-export { protectPlayableHtml } from './packager/protect-javascript'
 export { resolveTemplate } from './packager/template-resolver'
 export { buildOutputRows } from './packager/output-listing'
 export type { OutputBuildRow, OutputFileStat } from './packager/output-listing'

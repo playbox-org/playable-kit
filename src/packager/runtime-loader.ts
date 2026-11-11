@@ -16,7 +16,6 @@ import { JSZIP_MIN_JS } from '../generated/jszip-min'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import * as cheerio from 'cheerio'
-import { protectJavaScript } from './protect-javascript'
 
 export interface RuntimeLoaderOptions {
   /** Enable debug logging in the runtime */
@@ -1036,14 +1035,8 @@ export function generateFullHtml(params: {
     // Inline boot scripts directly into HTML — avoids dynamic code evaluation
     // which may be blocked by CSP in ad network validators like Mintegral
     if (buildDir) {
-      let source: string | undefined
       try {
-        source = _readFile(_join(buildDir, src), 'utf-8')
-      } catch {
-        /* file not in build dir — load from ZIP */
-      }
-      if (source !== undefined) {
-        let content = protectJavaScript(source)
+        let content = _readFile(_join(buildDir, src), 'utf-8')
         // NOTE: we do NOT FB-rewrite inlined system.bundle.js/polyfills here —
         // their createElement('script') is feature-detection code that breaks if
         // rewritten. Only cocos-js/* (real bundle loader) is rewritten, in the
@@ -1051,6 +1044,8 @@ export function generateFullHtml(params: {
         // Escape </script> inside JS to prevent HTML parser from breaking
         content = content.replace(/<\/script>/gi, '<\\/script>')
         return '<script>/* ' + src + ' */\n' + content + '</script>'
+      } catch {
+        /* file not in build dir — load from ZIP */
       }
     }
 

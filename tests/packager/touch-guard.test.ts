@@ -27,6 +27,12 @@ describe('touch guard', () => {
     expect(touch('touchstart', document.getElementById('game')!).defaultPrevented).toBe(false)
   })
 
+  it('still guards when the page itself is taller than the iframe', () => {
+    document.documentElement.style.overflowY = 'auto'
+    Object.defineProperty(document.documentElement, 'scrollHeight', { value: 2000, configurable: true })
+    expect(touch('touchmove', document.getElementById('game')!).defaultPrevented).toBe(true)
+  })
+
   it('lets form fields and scrollable blocks handle their own touch', () => {
     expect(touch('touchmove', document.getElementById('field')!).defaultPrevented).toBe(false)
     expect(touch('touchmove', document.getElementById('row')!).defaultPrevented).toBe(false)

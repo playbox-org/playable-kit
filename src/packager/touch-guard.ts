@@ -2,9 +2,9 @@
 // first finger move pans the host page and ends the pointer stream with `pointercancel`, so
 // pointer-only drags die. Only touchmove is cancelled: touchstart stays, so taps keep `click`.
 export const TOUCH_GUARD_SCRIPT = `(function(){
-var native='input,textarea,select,[contenteditable],[data-plbx-native-touch]';
+var native='input,textarea,select,[contenteditable]:not([contenteditable="false"]),[data-plbx-native-touch]';
 function scrolls(el){
-for(;el&&el.nodeType===1;el=el.parentElement){
+for(;el&&el.nodeType===1&&el!==document.body&&el!==document.documentElement;el=el.parentElement){
 var o=getComputedStyle(el).overflowY;
 if((o==='auto'||o==='scroll')&&el.scrollHeight>el.clientHeight)return true;
 }

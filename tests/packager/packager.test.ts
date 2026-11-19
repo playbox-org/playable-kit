@@ -440,6 +440,17 @@ describe('startup version banner', () => {
     expect(html).toContain('v0.2.3')
     expect(html).toContain('https://github.com/playbox-org/playable-kit')
   })
+
+  it('injects the iOS iframe touch guard into the HTML output', async () => {
+    const result = await packageForNetworks({
+      buildDir: MOCK_BUILD,
+      outputDir: PACK_OUTPUT,
+      networks: ['applovin'],
+      config: defaultConfig,
+    })
+    const html = readFileSync(result.results[0].outputPath, 'utf-8')
+    expect(html).toContain("document.addEventListener('touchmove'")
+  })
 })
 
 describe('store URL <head> comment (validator parity with super-html)', () => {

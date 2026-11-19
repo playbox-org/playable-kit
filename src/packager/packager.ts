@@ -59,6 +59,7 @@ import {
 import { extractAxonUsage, validateAxonEvents } from '../validation/axon-events'
 import { extractLunaUsage, validateLunaEvents } from '../validation/luna-events'
 import { buildVersionBanner } from './version-banner'
+import { TOUCH_GUARD_SCRIPT } from './touch-guard'
 import { base64SvgDataUris } from '../validation/data-uri-encoding'
 import CleanCSS from 'clean-css'
 import { KIT_VERSION } from '../version'
@@ -271,6 +272,7 @@ export async function packageForNetworks(
 
       // Startup version banner + plaintext store-URL <head> comments (super-html parity).
       builder.injectBodyScript(versionBanner)
+      builder.injectBodyScript(TOUCH_GUARD_SCRIPT)
       for (const url of headStoreUrls) {
         builder.injectHeadComment(url)
       }

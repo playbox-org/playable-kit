@@ -27,6 +27,7 @@ import {
   PackageConfig,
 } from '../types'
 import { PackagerOptions, PackagerResult } from './types'
+import type { SplashOptions } from './splash'
 import { packDirectoryToZip } from './asset-inliner'
 import { rewriteCocosJs, shouldRewriteCocosJs } from './cocos-js-rewriter'
 import {
@@ -141,12 +142,23 @@ export async function packageForNetworks(
   const splashLogoDataUrl = resolveSplashLogoDataUrl(
     options.config.customSplashLogo,
   )
-  const splashOpts = (cfg: PackageConfig) =>
-    cfg.showSplash !== true
-      ? null
-      : splashLogoDataUrl
-        ? { customLogo: { dataUrl: splashLogoDataUrl }, logoScale: cfg.splashLogoScale }
-        : {}
+  const splashOpts = (cfg: PackageConfig): SplashOptions | null => {
+    if (cfg.showSplash !== true) return null
+    const look = cfg.splash
+    const logo = look?.logoDataUrl ?? splashLogoDataUrl
+    return {
+      ...(logo ? { customLogo: { dataUrl: logo } } : {}),
+      logoScale: look?.logoScale ?? cfg.splashLogoScale,
+      ...(look
+        ? {
+            style: look.style ?? (logo ? 'logo' : 'playbox'),
+            background: look.background,
+            bar: look.bar,
+            logoRadius: look.logoRadius,
+          }
+        : {}),
+    }
+  }
 
   // Startup version banner injected into every build (console.log on run).
   const versionBanner = buildVersionBanner(
@@ -616,8 +628,7 @@ export async function packageForNetworks(
               buildDir: options.buildDir,
               loaderMode: effectiveLoaderMode,
               showSplash: packageConfig.showSplash === true,
-              splashLogoDataUrl,
-              splashLogoScale: packageConfig.splashLogoScale,
+              splashOptions: splashOpts(packageConfig) ?? undefined,
             })
           }
 
@@ -731,8 +742,7 @@ export async function packageForNetworks(
                       buildDir: options.buildDir,
                       loaderMode: effectiveLoaderMode,
                       showSplash: packageConfig.showSplash === true,
-                      splashLogoDataUrl,
-                      splashLogoScale: packageConfig.splashLogoScale,
+                      splashOptions: splashOpts(packageConfig) ?? undefined,
                       encoding: 'base122',
                     })
               if (enc === 'base122') {

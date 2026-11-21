@@ -14,6 +14,7 @@ export default defineConfig([
       networks: 'src/networks.ts',
       types: 'src/types.ts',
       sdk: 'src/sdk/index.ts',
+      splash: 'src/packager/splash.ts',
     },
     format: ['esm', 'cjs'],
     dts: true,

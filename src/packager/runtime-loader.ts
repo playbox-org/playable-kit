@@ -10,7 +10,7 @@
  */
 
 import { generateSelfContainedLoader } from './loader'
-import { buildSplash, FIRST_FRAME_HOOK_JS } from './splash'
+import { buildSplash, FIRST_FRAME_HOOK_JS, type SplashOptions } from './splash'
 import { encodeBase122, emitBase122Decoder } from './base122'
 import { JSZIP_MIN_JS } from '../generated/jszip-min'
 import { readFileSync } from 'fs'
@@ -946,6 +946,8 @@ export function generateFullHtml(params: {
   /** Client logo size as a % of the viewport's shorter side (vmin). Ignored
    *  unless splashLogoDataUrl is set; see SplashOptions.logoScale. */
   splashLogoScale?: number
+  /** Full splash options; when set, wins over splashLogoDataUrl / splashLogoScale. */
+  splashOptions?: SplashOptions
   /** Asset-container encoding. 'base122' (~14% smaller) only applies to the
    *  self-contained loader; the legacy systemjs path is always base64. */
   encoding?: 'base64' | 'base122'
@@ -1062,12 +1064,13 @@ export function generateFullHtml(params: {
   let splashJs = ''
   if (params.showSplash) {
     const splash = buildSplash(
-      params.splashLogoDataUrl
+      params.splashOptions ??
+      (params.splashLogoDataUrl
         ? {
             customLogo: { dataUrl: params.splashLogoDataUrl },
             logoScale: params.splashLogoScale,
           }
-        : {},
+        : {}),
     )
     rewrittenHtml = rewrittenHtml.replace(
       /<\/head>/i,

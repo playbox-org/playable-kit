@@ -54,7 +54,7 @@ describe('splash look', () => {
     expect(s.styleCss).toContain('background:#ffffff;')
     expect(s.styleCss).toContain('color:#14121a;')
     expect(s.bodyHtml).toContain('fill="currentColor"')
-    expect(s.styleCss).toContain('#14121a1a')
+    expect(s.styleCss).toContain('#14121a1f')
     expect(splashInk({ kind: 'solid', color: '#06020d' })).toBe('#fff')
     expect(splashInk({ kind: 'gradient', from: '#ffffff', to: '#f0f0f0' })).toBe('#14121a')
   })
@@ -77,6 +77,14 @@ describe('splash look', () => {
     expect(s.styleCss).not.toContain('</style>')
     expect(s.styleCss).not.toContain('url(x)')
     expect(s.styleCss).toContain('background:#000;')
+  })
+
+  it('sizes the sweep bar to the logo and paints it in the platform gradient', () => {
+    expect(buildSplash().styleCss).toContain('#s .b{width:84px;')
+    expect(buildSplash().styleCss).toContain('#ff9500,#ff6b9d 33%,#c850c0 66%,#6366f1')
+    const logo = buildSplash({ customLogo: { dataUrl: LOGO }, style: 'logo', logoScale: 30 })
+    expect(logo.styleCss).toContain('#s .b{width:30vmin;')
+    expect(logo.styleCss).toContain('mask-position')
   })
 
   it('rounds and clamps the logo radius', () => {

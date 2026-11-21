@@ -112,7 +112,8 @@ export function clampLogoScale(n?: number): number {
   return Math.round(Math.min(MAX_LOGO_SCALE, Math.max(MIN_LOGO_SCALE, n)))
 }
 
-const BRAND_BAR = 'linear-gradient(90deg,#ffb86c,#e850c1,#49eaff)'
+// The platform's brand gradient (apps/web --gradient-rainbow).
+const BRAND_BAR = 'linear-gradient(90deg,#ff9500,#ff6b9d 33%,#c850c0 66%,#6366f1)'
 const DARK_INK = '#14121a'
 // Colors and the logo come from client settings and land inside <style> and an
 // attribute, so anything that is not a plain hex / base64 image is dropped.
@@ -203,7 +204,8 @@ export function buildSplash(opts: SplashOptions = {}): SplashParts {
 
   let logo: string
   let wordmark = ''
-  if (style !== 'playbox' && customUrl) {
+  const logoBox = style !== 'playbox' && !!customUrl
+  if (logoBox) {
     // `width`, not `max-width`: the scale is the authority on rendered size in
     // both directions. `height:auto` + `max-height` keep the aspect ratio.
     const scale = clampLogoScale(opts.logoScale)
@@ -244,16 +246,21 @@ export function buildSplash(opts: SplashOptions = {}): SplashParts {
 
   let barHtml = ''
   if (bar.kind !== 'off') {
-    // Indeterminate bar: pure-CSS animated track, no JS state.
+    // "Sweep": a dim track as wide as the logo, with a bright window of the
+    // gradient sliding across it. The gradient stays put; only the mask moves.
+    // Without mask support the whole gradient line simply shows.
     const fill =
       bar.kind === 'solid' ? (safeSplashColor(bar.color) ?? BRAND_BAR) : BRAND_BAR
+    const width = logoBox ? `${clampLogoScale(opts.logoScale)}vmin` : '84px'
+    const window = 'linear-gradient(90deg,#0000,#000,#0000) 0 0/45% 100% no-repeat'
     styleCss +=
-      '#s .b{width:128px;height:4px;border-radius:4px;overflow:hidden;' +
-      `background:${ink === '#fff' ? '#ffffff1a' : '#14121a1a'}}` +
-      '#s .b i{display:block;width:40%;height:100%;border-radius:4px;' +
-      `background:${fill};` +
-      'animation:pb 1.2s ease-in-out infinite}' +
-      '@keyframes pb{0%{transform:translateX(-100%)}100%{transform:translateX(350%)}}'
+      `#s .b{width:${width};height:3px;border-radius:3px;position:relative;overflow:hidden;` +
+      `background:${ink === '#fff' ? '#ffffff1f' : '#14121a1f'}}` +
+      `#s .b i{position:absolute;inset:0;background:${fill};` +
+      `-webkit-mask:${window};mask:${window};` +
+      'animation:pb 1.3s ease-in-out infinite}' +
+      '@keyframes pb{0%{-webkit-mask-position:-80% 0;mask-position:-80% 0}' +
+      '100%{-webkit-mask-position:180% 0;mask-position:180% 0}}'
     barHtml = '<div class=b><i></i></div>'
   }
 

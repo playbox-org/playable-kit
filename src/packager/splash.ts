@@ -169,11 +169,7 @@ export function buildSplash(opts: SplashOptions = {}): SplashParts {
       : undefined
   // A customLogo call with no style is the pre-0.5 API: black, no bar.
   const legacyLogo = !!customUrl && opts.style === undefined
-  const style: SplashStyle = !customUrl
-    ? 'playbox'
-    : (opts.style ?? 'logo') === 'playbox'
-      ? 'playbox'
-      : (opts.style ?? 'logo')
+  const style: SplashStyle = customUrl ? (opts.style ?? 'logo') : 'playbox'
   const svgWord = opts.svgWordmark !== false
   // Compact mode (Moloco launcher, 3 KB ceiling) trades the staggered petal
   // pulse + second glow gradient for a whole-mark pulse — ~250 B cheaper.
@@ -252,12 +248,12 @@ export function buildSplash(opts: SplashOptions = {}): SplashParts {
     const fill =
       bar.kind === 'solid' ? (safeSplashColor(bar.color) ?? BRAND_BAR) : BRAND_BAR
     const width = logoBox ? `${clampLogoScale(opts.logoScale)}vmin` : '84px'
-    const window = 'linear-gradient(90deg,#0000,#000,#0000) 0 0/45% 100% no-repeat'
+    const fade = 'linear-gradient(90deg,#0000,#000,#0000) 0 0/45% 100% no-repeat'
     styleCss +=
       `#s .b{width:${width};height:3px;border-radius:3px;position:relative;overflow:hidden;` +
       `background:${ink === '#fff' ? '#ffffff1f' : '#14121a1f'}}` +
       `#s .b i{position:absolute;inset:0;background:${fill};` +
-      `-webkit-mask:${window};mask:${window};` +
+      `-webkit-mask:${fade};mask:${fade};` +
       'animation:pb 1.3s ease-in-out infinite}' +
       '@keyframes pb{0%{-webkit-mask-position:-80% 0;mask-position:-80% 0}' +
       '100%{-webkit-mask-position:180% 0;mask-position:180% 0}}'

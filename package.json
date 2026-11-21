@@ -49,6 +49,16 @@
         "types": "./dist/sdk.d.cts",
         "default": "./dist/sdk.cjs"
       }
+    },
+    "./splash": {
+      "import": {
+        "types": "./dist/splash.d.ts",
+        "default": "./dist/splash.js"
+      },
+      "require": {
+        "types": "./dist/splash.d.cts",
+        "default": "./dist/splash.cjs"
+      }
     }
   },
   "typesVersions": {

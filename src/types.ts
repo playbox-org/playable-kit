@@ -77,6 +77,9 @@ export interface PackageConfig {
    *  (emitted as `vmin`). Default 26 — the responsive equivalent of the fixed
    *  96px cap this replaced. Clamped to 5–100. Ignored without a custom logo. */
   splashLogoScale?: number
+  /** Loader look: layout, logo, backdrop, bar. Needs `showSplash: true`.
+   *  `logoDataUrl` wins over `customSplashLogo`. */
+  splash?: SplashLook
   /** Asset-container encodings to emit (self-contained loader only). Default
    *  ['base64']. With both, base122 → primary `index.html`, base64 → sibling `.b64.html`. */
   assetEncodings?: ('base64' | 'base122')[]
@@ -179,4 +182,26 @@ export interface CheckResult {
   label: string
   status: 'passed' | 'warning' | 'failed'
   details: string | null
+}
+
+export type SplashStyle = 'playbox' | 'logo_playbox' | 'logo'
+
+export type SplashBackground =
+  | { kind: 'brand' }
+  | { kind: 'solid'; color: string }
+  | { kind: 'gradient'; from: string; to: string }
+
+export type SplashBar =
+  | { kind: 'brand' }
+  | { kind: 'solid'; color: string }
+  | { kind: 'off' }
+
+export interface SplashLook {
+  style?: SplashStyle
+  /** `data:image/(png|jpeg|webp|gif);base64,…`; anything else is ignored. */
+  logoDataUrl?: string
+  logoScale?: number
+  logoRadius?: number
+  background?: SplashBackground
+  bar?: SplashBar
 }

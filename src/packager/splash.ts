@@ -1,3 +1,7 @@
+import type { SplashBackground, SplashBar, SplashStyle } from '../types'
+
+export type { SplashBackground, SplashBar, SplashStyle }
+
 /**
  * PLBX branded loading splash — single source of truth.
  *
@@ -69,6 +73,24 @@ export interface SplashOptions {
    * Clamped to {@link MIN_LOGO_SCALE}–{@link MAX_LOGO_SCALE}.
    */
   logoScale?: number
+  /**
+   * Layout. Default: `'logo'` when `customLogo` is set, else `'playbox'`.
+   * `'logo_playbox'` shows the client logo with a small "made with Playbox"
+   * line at the bottom. Without a usable logo the splash is always `'playbox'`.
+   */
+  style?: SplashStyle
+  /**
+   * Backdrop. Default: the brand glow. A `customLogo` call that sets no
+   * `style` keeps the plain black backdrop it always had.
+   */
+  background?: SplashBackground
+  /**
+   * Progress bar. Default: the brand gradient (none when `withProgressBar` is
+   * false). A `customLogo` call that sets no `style` keeps no bar.
+   */
+  bar?: SplashBar
+  /** Logo corner radius as a % of its box, 0–50. Store icons look right at 22. */
+  logoRadius?: number
 }
 
 /** Default custom-logo scale: 26vmin ≈ the 96px this replaced, at 375pt wide. */
@@ -90,53 +112,107 @@ export function clampLogoScale(n?: number): number {
   return Math.round(Math.min(MAX_LOGO_SCALE, Math.max(MIN_LOGO_SCALE, n)))
 }
 
-export function buildSplash(opts: SplashOptions = {}): SplashParts {
-  const customUrl = opts.customLogo?.dataUrl
-  const custom = !!customUrl
-  // Custom client logo → plain black, no gradients, no progress bar (the client
-  // brand stands alone). PLBX splash keeps its branded backdrop + bar.
-  const withBar = opts.withProgressBar !== false && !custom
-  const svgWord = opts.svgWordmark !== false
+const BRAND_BAR = 'linear-gradient(90deg,#ffb86c,#e850c1,#49eaff)'
+const DARK_INK = '#14121a'
+// Colors and the logo come from client settings and land inside <style> and an
+// attribute, so anything that is not a plain hex / base64 image is dropped.
+const HEX_COLOR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i
+const LOGO_DATA_URL = /^data:image\/(?:png|jpeg|webp|gif);base64,[A-Za-z0-9+/]+=*$/
 
+export function safeSplashColor(value: unknown): string | null {
+  return typeof value === 'string' && HEX_COLOR.test(value) ? value : null
+}
+
+function luminance(hex: string): number {
+  const h = hex.slice(1)
+  const full = h.length < 6 ? h.slice(0, 3).replace(/./g, '$&$&') : h.slice(0, 6)
+  const [r, g, b] = [0, 2, 4].map((at) => {
+    const c = parseInt(full.slice(at, at + 2), 16) / 255
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+  })
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b
+}
+
+function backgroundCss(bg: SplashBackground | null, compact: boolean): string {
+  if (bg?.kind === 'solid') return safeSplashColor(bg.color) ?? '#000'
+  if (bg?.kind === 'gradient') {
+    const from = safeSplashColor(bg.from)
+    const to = safeSplashColor(bg.to)
+    if (from && to) return `linear-gradient(180deg,${from},${to})`
+  }
+  return (
+    'radial-gradient(60% 38% at 50% 0,#ff7a2629,#0000 70%)' +
+    (compact ? '' : ',radial-gradient(50% 40% at 50% 110%,#6833fb38,#0000 70%)') +
+    ' #06020d'
+  )
+}
+
+/** Text and track color that reads on the backdrop: white on dark, near-black on light. */
+export function splashInk(bg: SplashBackground | null | undefined): string {
+  const colors =
+    bg?.kind === 'solid'
+      ? [safeSplashColor(bg.color)]
+      : bg?.kind === 'gradient'
+        ? [safeSplashColor(bg.from), safeSplashColor(bg.to)]
+        : []
+  const known = colors.filter((c): c is string => c !== null)
+  if (!known.length) return '#fff'
+  const average = known.reduce((sum, c) => sum + luminance(c), 0) / known.length
+  return average > 0.45 ? DARK_INK : '#fff'
+}
+
+export function buildSplash(opts: SplashOptions = {}): SplashParts {
+  const customUrl =
+    opts.customLogo && LOGO_DATA_URL.test(opts.customLogo.dataUrl)
+      ? opts.customLogo.dataUrl
+      : undefined
+  // A customLogo call with no style is the pre-0.5 API: black, no bar.
+  const legacyLogo = !!customUrl && opts.style === undefined
+  const style: SplashStyle = !customUrl
+    ? 'playbox'
+    : (opts.style ?? 'logo') === 'playbox'
+      ? 'playbox'
+      : (opts.style ?? 'logo')
+  const svgWord = opts.svgWordmark !== false
   // Compact mode (Moloco launcher, 3 KB ceiling) trades the staggered petal
   // pulse + second glow gradient for a whole-mark pulse — ~250 B cheaper.
   const compact = !svgWord
 
-  const bg = custom
-    ? '#000'
-    : 'radial-gradient(60% 38% at 50% 0,#ff7a2629,#0000 70%)' +
-      (compact
-        ? ''
-        : ',radial-gradient(50% 40% at 50% 110%,#6833fb38,#0000 70%)') +
-      ' #06020d'
+  const background: SplashBackground | null = legacyLogo
+    ? { kind: 'solid', color: '#000' }
+    : (opts.background ?? null)
+  const ink = splashInk(background)
+  const bar: SplashBar =
+    legacyLogo || opts.withProgressBar === false
+      ? { kind: 'off' }
+      : (opts.bar ?? { kind: 'brand' })
 
   let styleCss =
     '#s{position:fixed;inset:0;' +
     'display:flex;flex-direction:column;gap:20px;' +
     'align-items:center;justify-content:center;z-index:9999;' +
     'background:' +
-    bg +
+    backgroundCss(background, compact) +
     ';' +
+    (ink === '#fff' ? '' : `color:${ink};`) +
     'transition:opacity .5s ease-out}' +
     '#s.h{opacity:0;pointer-events:none}'
 
+  const wordmarkSvg =
+    ink === '#fff' ? PLBX_WORDMARK_SVG : PLBX_WORDMARK_SVG.replace(/fill="white"/g, 'fill="currentColor"')
+
   let logo: string
   let wordmark = ''
-  if (customUrl) {
-    // Custom client logo: fit any aspect, whole-image pulse, no PLBX wordmark.
-    //
-    // `width`, not `max-width`: a cap only shrinks, so an asset smaller than the
-    // cap would keep its intrinsic size and the scale would silently stop
-    // responding above it — the complaint that started this was "make the logo
-    // bigger". The scale is the authority on rendered size, in both directions.
-    //
-    // The aspect ratio still survives: `height:auto` derives height from the
-    // width, and `max-height` catches a tall logo — for a replaced element the
-    // constrained height re-derives the width, so nothing stretches.
+  if (style !== 'playbox' && customUrl) {
+    // `width`, not `max-width`: the scale is the authority on rendered size in
+    // both directions. `height:auto` + `max-height` keep the aspect ratio.
     const scale = clampLogoScale(opts.logoScale)
+    const radius = Math.min(50, Math.max(0, Math.round(opts.logoRadius ?? 0)))
     styleCss +=
       `#lg{width:${scale}vmin;height:auto;max-height:${scale}vmin;` +
-      'object-fit:contain;animation:pq 1.8s ease infinite}' +
+      'object-fit:contain;' +
+      (radius ? `border-radius:${radius}%;` : '') +
+      'animation:pq 1.8s ease infinite}' +
       '@keyframes pq{0%,100%{transform:scale(1)}50%{transform:scale(.9)}}'
     logo = `<img id="lg" src="${customUrl}" alt="">`
   } else {
@@ -157,29 +233,45 @@ export function buildSplash(opts: SplashOptions = {}): SplashParts {
     if (svgWord) {
       // Wordmark width matches the mark width.
       styleCss += '#s .wm{width:84px;height:auto;display:block;opacity:.95}'
-      wordmark = PLBX_WORDMARK_SVG
+      wordmark = wordmarkSvg
     } else {
       // Compact wordmark text. system-ui only — the named-font stack and
       // letter-spacing cost ~43 B the 3 KB launcher budget can't spare.
-      styleCss += '#s .t{font:800 19px/1 system-ui,sans-serif;color:#fff}'
+      styleCss += `#s .t{font:800 19px/1 system-ui,sans-serif;color:${ink}}`
       wordmark = '<div class=t>Playbox</div>'
     }
   }
 
-  let bar = ''
-  if (withBar) {
-    // Indeterminate bar: pure-CSS animated track, brand gradient, no JS state.
+  let barHtml = ''
+  if (bar.kind !== 'off') {
+    // Indeterminate bar: pure-CSS animated track, no JS state.
+    const fill =
+      bar.kind === 'solid' ? (safeSplashColor(bar.color) ?? BRAND_BAR) : BRAND_BAR
     styleCss +=
       '#s .b{width:128px;height:4px;border-radius:4px;overflow:hidden;' +
-      'background:#ffffff1a}' +
+      `background:${ink === '#fff' ? '#ffffff1a' : '#14121a1a'}}` +
       '#s .b i{display:block;width:40%;height:100%;border-radius:4px;' +
-      'background:linear-gradient(90deg,#ffb86c,#e850c1,#49eaff);' +
+      `background:${fill};` +
       'animation:pb 1.2s ease-in-out infinite}' +
       '@keyframes pb{0%{transform:translateX(-100%)}100%{transform:translateX(350%)}}'
-    bar = '<div class=b><i></i></div>'
+    barHtml = '<div class=b><i></i></div>'
   }
 
-  const bodyHtml = `<div id="s">${logo}${wordmark}${bar}</div>`
+  let footer = ''
+  if (style === 'logo_playbox') {
+    styleCss +=
+      '#s .ft{position:absolute;left:0;right:0;bottom:6vh;display:flex;' +
+      'align-items:center;justify-content:center;gap:6px;' +
+      `font:600 11px/1 system-ui,sans-serif;color:${ink};opacity:.72}` +
+      '#s .ft svg{display:block}#s .ft .fm{width:14px;height:14px}#s .ft .fw{width:52px;height:auto}'
+    footer =
+      '<div class=ft><span>made with</span>' +
+      PLBX_LOGO_SVG.replace(' id="lg"', ' class="fm"') +
+      wordmarkSvg.replace('class="wm"', 'class="fw"').replace(/fill="white"/g, 'fill="currentColor"') +
+      '</div>'
+  }
+
+  const bodyHtml = `<div id="s">${logo}${wordmark}${barHtml}${footer}</div>`
 
   const hideJs =
     'window.__plbx_splash_hide=function(){var s=document.getElementById("s");' +

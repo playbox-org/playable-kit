@@ -91,6 +91,12 @@ export interface SplashOptions {
   bar?: SplashBar
   /** Logo corner radius as a % of its box, 0–50. Store icons look right at 22. */
   logoRadius?: number
+  /**
+   * Width of the "made with Playbox" line as a percentage of the viewport's
+   * shorter side, like `logoScale` (default {@link DEFAULT_BADGE_SCALE}).
+   * Only the `'logo_playbox'` style draws it.
+   */
+  badgeScale?: number
 }
 
 /** Default custom-logo scale: 26vmin ≈ the 96px this replaced, at 375pt wide. */
@@ -107,6 +113,19 @@ export const MAX_LOGO_SCALE = 100
  * would void the whole declaration and restore the browser default — the
  * image's intrinsic size, i.e. a potentially full-bleed logo.
  */
+/** Default made-with line: about 105px wide at 375pt, a little under the 11px text it replaced. */
+export const DEFAULT_BADGE_SCALE = 28
+export const MIN_BADGE_SCALE = 16
+export const MAX_BADGE_SCALE = 48
+
+export function clampBadgeScale(n?: number): number {
+  if (typeof n !== 'number' || !Number.isFinite(n)) return DEFAULT_BADGE_SCALE
+  return Math.round(Math.min(MAX_BADGE_SCALE, Math.max(MIN_BADGE_SCALE, n)))
+}
+
+// The made-with line is about 11.5em wide: the words, the mark, the wordmark and two gaps.
+const BADGE_EMS = 11.5
+
 export function clampLogoScale(n?: number): number {
   if (typeof n !== 'number' || !Number.isFinite(n)) return DEFAULT_LOGO_SCALE
   return Math.round(Math.min(MAX_LOGO_SCALE, Math.max(MIN_LOGO_SCALE, n)))
@@ -201,13 +220,23 @@ export function buildSplash(opts: SplashOptions = {}): SplashParts {
   let logo: string
   let wordmark = ''
   const logoBox = style !== 'playbox' && !!customUrl
+  const scale = clampLogoScale(opts.logoScale)
+  const badgeFont = +(clampBadgeScale(opts.badgeScale) / BADGE_EMS).toFixed(2)
+  // The logo and its bar sit centred while the made-with line is pinned to the
+  // bottom; in landscape `vmin` is the height, so a big logo would run into it.
+  // Capping the logo by the height left over keeps them apart at any scale. The
+  // plain `vmin` value goes first for webviews without min()/calc().
+  const logoSize =
+    style === 'logo_playbox'
+      ? `min(${scale}vmin,calc(88vh - ${+(2.6 * badgeFont).toFixed(2)}vmin - 39px))`
+      : `min(${scale}vmin,calc(100vh - 55px))`
   if (logoBox) {
     // `width`, not `max-width`: the scale is the authority on rendered size in
     // both directions. `height:auto` + `max-height` keep the aspect ratio.
-    const scale = clampLogoScale(opts.logoScale)
     const radius = Math.min(50, Math.max(0, Math.round(opts.logoRadius ?? 0)))
     styleCss +=
-      `#lg{width:${scale}vmin;height:auto;max-height:${scale}vmin;` +
+      `#lg{width:${scale}vmin;width:${logoSize};height:auto;` +
+      `max-height:${scale}vmin;max-height:${logoSize};` +
       'object-fit:contain;' +
       (radius ? `border-radius:${radius}%;` : '') +
       'animation:pq 1.8s ease infinite}' +
@@ -247,7 +276,7 @@ export function buildSplash(opts: SplashOptions = {}): SplashParts {
     // Without mask support the whole gradient line simply shows.
     const fill =
       bar.kind === 'solid' ? (safeSplashColor(bar.color) ?? BRAND_BAR) : BRAND_BAR
-    const width = logoBox ? `${clampLogoScale(opts.logoScale)}vmin` : '84px'
+    const width = logoBox ? `${scale}vmin;width:${logoSize}` : '84px'
     const fade = 'linear-gradient(90deg,#0000,#000,#0000) 0 0/45% 100% no-repeat'
     styleCss +=
       `#s .b{width:${width};height:3px;border-radius:3px;position:relative;overflow:hidden;` +
@@ -264,9 +293,9 @@ export function buildSplash(opts: SplashOptions = {}): SplashParts {
   if (style === 'logo_playbox') {
     styleCss +=
       '#s .ft{position:absolute;left:0;right:0;bottom:6vh;display:flex;' +
-      'align-items:center;justify-content:center;gap:6px;' +
-      `font:600 11px/1 system-ui,sans-serif;color:${ink};opacity:.72}` +
-      '#s .ft svg{display:block}#s .ft .fm{width:14px;height:14px}#s .ft .fw{width:52px;height:auto}'
+      'align-items:center;justify-content:center;gap:.5em;' +
+      `font:600 11px/1 system-ui,sans-serif;font-size:${badgeFont}vmin;color:${ink};opacity:.72}` +
+      '#s .ft svg{display:block}#s .ft .fm{width:1.3em;height:1.3em}#s .ft .fw{width:4.7em;height:auto}'
     footer =
       '<div class=ft><span>made with</span>' +
       PLBX_LOGO_SVG.replace(' id="lg"', ' class="fm"') +

@@ -25,8 +25,12 @@ export { HtmlBuilder } from './packager/html-builder'
 // CSS that ships in the build (and price it) instead of keeping its own copy.
 export {
   buildSplash,
+  clampBadgeScale,
   clampLogoScale,
   splashByteCost,
+  DEFAULT_BADGE_SCALE,
+  MIN_BADGE_SCALE,
+  MAX_BADGE_SCALE,
   DEFAULT_LOGO_SCALE,
   MIN_LOGO_SCALE,
   MAX_LOGO_SCALE,

@@ -202,6 +202,7 @@ export interface SplashLook {
   logoDataUrl?: string
   logoScale?: number
   logoRadius?: number
+  badgeScale?: number
   background?: SplashBackground
   bar?: SplashBar
 }

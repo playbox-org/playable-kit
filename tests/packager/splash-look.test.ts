@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync, rmSync } from 'fs'
 import { join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
 import { packageForNetworks } from '../../src/packager/packager'
-import { buildSplash, splashInk } from '../../src/packager/splash'
+import { buildSplash, clampBadgeScale, splashInk } from '../../src/packager/splash'
 
 const LOGO = 'data:image/webp;base64,UklGRhIAAABXRUJQVlA4TAYAAAAvAAAAAAA='
 const OUT = join(__dirname, '../fixtures/splash-look-out')
@@ -107,6 +107,7 @@ describe('splash look', () => {
           style: 'logo_playbox',
           logoDataUrl: LOGO,
           logoRadius: 22,
+          badgeScale: 40,
           background: { kind: 'solid', color: '#fafafa' },
         },
       },
@@ -121,5 +122,30 @@ describe('splash look', () => {
     expect(html).toContain('made with')
     expect(html).toContain('border-radius:22%;')
     expect(html).toContain('color:#14121a;')
+    expect(html).toContain('font-size:3.48vmin;')
+  })
+
+  it('caps the logo by the height left over, so a big logo never meets the made-with line', () => {
+    const css = (style: 'logo' | 'logo_playbox') =>
+      buildSplash({ customLogo: { dataUrl: LOGO }, style, logoScale: 60 }).styleCss
+    expect(css('logo_playbox')).toContain(
+      '#lg{width:60vmin;width:min(60vmin,calc(88vh - 6.32vmin - 39px));height:auto;',
+    )
+    expect(css('logo_playbox')).toContain(
+      '#s .b{width:60vmin;width:min(60vmin,calc(88vh - 6.32vmin - 39px));height:3px;',
+    )
+    expect(css('logo')).toContain('width:min(60vmin,calc(100vh - 55px))')
+  })
+
+  it('sizes the made-with line by the screen, clamped to its range', () => {
+    const font = (badgeScale?: number) =>
+      buildSplash({ customLogo: { dataUrl: LOGO }, style: 'logo_playbox', badgeScale }).styleCss.match(
+        /font-size:([\d.]+)vmin/,
+      )?.[1]
+    expect(font()).toBe('2.43')
+    expect(font(16)).toBe('1.39')
+    expect(font(200)).toBe(String(+(48 / 11.5).toFixed(2)))
+    expect(clampBadgeScale(Number.NaN)).toBe(28)
+    expect(buildSplash({ customLogo: { dataUrl: LOGO }, style: 'logo' }).styleCss).not.toContain('.ft{')
   })
 })

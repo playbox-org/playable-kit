@@ -155,6 +155,7 @@ export async function packageForNetworks(
             background: look.background,
             bar: look.bar,
             logoRadius: look.logoRadius,
+            badgeScale: look.badgeScale,
           }
         : {}),
     }

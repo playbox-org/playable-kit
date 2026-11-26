@@ -243,18 +243,9 @@ export function validateAxonEvents(usage: AxonUsage): AxonCheck[] {
   return checks
 }
 
-// Events that must fire exactly once (spec: "Deduped: Yes"). The lifecycle
-// one-shots plus CHALLENGE_STARTED (sent only on the user's first click) and
-// CTA_CLICKED. Excluded: the other CHALLENGE_* events, which legitimately repeat
-// across retries.
-const DEDUP_ONCE_EVENTS = [
-  'LOADING',
-  'LOADED',
-  'DISPLAYED',
-  'ENDCARD_SHOWN',
-  'CHALLENGE_STARTED',
-  'CTA_CLICKED',
-]
+// AppLovin marks every event "Deduped?: Yes" (its reporting collapses repeats); only these
+// fire once. CTA_CLICKED and ENDCARD_SHOWN may repeat, like the other CHALLENGE_*.
+const DEDUP_ONCE_EVENTS = ['LOADING', 'LOADED', 'DISPLAYED', 'CHALLENGE_STARTED']
 
 // AppLovin forbids dispatching CHALLENGE_* events simultaneously: any two must be
 // at least this far apart (client requirement). CHALLENGE_* must mark distinct
@@ -279,18 +270,18 @@ const ORDER_PAIRS: ReadonlyArray<readonly [string, string]> = [
   ['CHALLENGE_PASS_50', 'CHALLENGE_PASS_75'],
   ['DISPLAYED', 'ENDCARD_SHOWN'],
   ['DISPLAYED', 'CTA_CLICKED'],
-  // The challenge must resolve before the end card is shown.
+  // The challenge must resolve before the last end card is shown.
   ['CHALLENGE_SOLVED', 'ENDCARD_SHOWN'],
 ]
 
 /**
  * Validate a runtime fire SEQUENCE (ordered, with repeats) against the spec.
  * Superset of validateAxonEvents — adds the checks that only a live run can make
- * (lifecycle order, no duplicate one-shot fires) plus an aggregate roll-up. Used
+ * (lifecycle order, no duplicate one-shot fires) plus an aggregate roll-up.
  * The package-time gate uses validateAxonEvents (a static scan can't know order
- * or fire counts). This is the unit-tested reference for the runtime rules; the
- * preview panel (static/preview/preview.js, computeAxonChecks) mirrors it in
- * browser JS — keep the two in sync.
+ * or fire counts). This is the unit-tested reference for the runtime rules; keep
+ * its copies in sync: playbox-platform packages/playable-preview-harness/axon.ts
+ * and plbx-cocos-assistant static/preview/preview.js (both computeAxonChecks).
  *
  * @param sequence ordered event names (with repeats) as they fired
  * @param timestamps optional ms timestamps aligned to `sequence`; when present,
@@ -349,12 +340,15 @@ export function validateAxonSequence(
   }
 
   // Lifecycle order (pairwise, first-occurrence).
-  const orderViolations = ORDER_PAIRS.filter(
-    ([a, b]) =>
-      firstIdx[a] !== undefined &&
-      firstIdx[b] !== undefined &&
-      firstIdx[a] > firstIdx[b],
-  ).map(([a, b]) => `${a} should precede ${b}`)
+  const orderViolations = ORDER_PAIRS.filter(([a, b]) => {
+    if (firstIdx[a] === undefined || firstIdx[b] === undefined) return false
+    // A fail end card before a retry is fine: SOLVED must precede only the last one.
+    const bIdx =
+      a === 'CHALLENGE_SOLVED' && b === 'ENDCARD_SHOWN'
+        ? sequence.lastIndexOf(b)
+        : firstIdx[b]
+    return firstIdx[a] > bIdx
+  }).map(([a, b]) => `${a} should precede ${b}`)
   checks.push({
     id: 'order',
     label: 'Events fired in lifecycle order',

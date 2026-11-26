@@ -243,17 +243,14 @@ export function validateAxonEvents(usage: AxonUsage): AxonCheck[] {
   return checks
 }
 
-// Events that must fire exactly once (spec: "Deduped: Yes"). The lifecycle
-// one-shots plus CHALLENGE_STARTED (sent only on the user's first click) and
-// CTA_CLICKED. Excluded: the other CHALLENGE_* events, which legitimately repeat
-// across retries.
+// AppLovin marks every event "Deduped?: Yes" (its reporting collapses repeats); only
+// these one-shots must fire once. CTA_CLICKED and the other CHALLENGE_* may repeat.
 const DEDUP_ONCE_EVENTS = [
   'LOADING',
   'LOADED',
   'DISPLAYED',
   'ENDCARD_SHOWN',
   'CHALLENGE_STARTED',
-  'CTA_CLICKED',
 ]
 
 // AppLovin forbids dispatching CHALLENGE_* events simultaneously: any two must be

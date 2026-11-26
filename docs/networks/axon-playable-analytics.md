@@ -96,7 +96,7 @@ and adds the checks a static scan can't make, plus an aggregate roll-up:
 |-------|-------|------|
 | `all_conformant` | error/warn | Aggregate headline — ok iff every other check passes |
 | `order` | warn | First-fire of each event respects the lifecycle order (pairwise, retry-safe). Includes `CHALLENGE_PASS_25` → `_50` → `_75`, `CHALLENGE_FAILED` before `CHALLENGE_RETRY`, `CHALLENGE_SOLVED` before `ENDCARD_SHOWN`, and `CTA_CLICKED` only after `DISPLAYED` (any time — *not* tied to `ENDCARD_SHOWN`). `CHALLENGE_STARTED` first is **not** an order warning — it's the error-level `challenge_requires_started` |
-| `dedup` | warn | Fire-once events (`LOADING`/`LOADED`/`DISPLAYED`/`ENDCARD_SHOWN`/`CHALLENGE_STARTED`/`CTA_CLICKED`) fire once per the spec's "Deduped: Yes". Excluded: the other `CHALLENGE_*` events, which legitimately repeat across retries |
+| `dedup` | warn | The spec marks every event "Deduped?: Yes": a reporting property (AppLovin collapses repeats), not a rule that the creative sends each event once. The kit flags repeats only for the lifecycle one-shots (`LOADING`/`LOADED`/`DISPLAYED`/`ENDCARD_SHOWN`) and `CHALLENGE_STARTED`. `CTA_CLICKED` may fire on every CTA click, and the other `CHALLENGE_*` events repeat across retries |
 | `challenge_spacing` | warn | Any two `CHALLENGE_*` events ≥ 50 ms apart — AppLovin forbids simultaneous dispatch; each must mark a distinct gameplay moment (needs runtime timestamps) |
 
 It also carries all the set-based checks above (computed from the deduped set).

@@ -364,14 +364,25 @@ describe('validateAxonSequence', () => {
     expect(byId(checks, 'dedup')?.detail).toContain('DISPLAYED')
   })
 
-  it('flags CTA_CLICKED firing more than once (spec deduped)', () => {
+  it('lets CTA_CLICKED repeat (every CTA click is reported)', () => {
     const checks = validateAxonSequence([
       'DISPLAYED',
       'CTA_CLICKED',
       'CTA_CLICKED',
     ])
+    expect(byId(checks, 'dedup')?.ok).toBe(true)
+  })
+
+  it('flags a repeated DISPLAYED but not the repeated CTA_CLICKED beside it', () => {
+    const checks = validateAxonSequence([
+      'DISPLAYED',
+      'CTA_CLICKED',
+      'DISPLAYED',
+      'CTA_CLICKED',
+    ])
     expect(byId(checks, 'dedup')?.ok).toBe(false)
-    expect(byId(checks, 'dedup')?.detail).toContain('CTA_CLICKED')
+    expect(byId(checks, 'dedup')?.detail).toContain('DISPLAYED')
+    expect(byId(checks, 'dedup')?.detail).not.toContain('CTA_CLICKED')
   })
 
   it('flags CHALLENGE_STARTED firing more than once (first click only)', () => {

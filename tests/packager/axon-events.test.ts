@@ -385,6 +385,33 @@ describe('validateAxonSequence', () => {
     expect(byId(checks, 'dedup')?.detail).not.toContain('CTA_CLICKED')
   })
 
+  it('lets ENDCARD_SHOWN repeat on a retry from the end card', () => {
+    const checks = validateAxonSequence([
+      'DISPLAYED',
+      'CHALLENGE_STARTED',
+      'CHALLENGE_FAILED',
+      'ENDCARD_SHOWN',
+      'CHALLENGE_RETRY',
+      'CHALLENGE_SOLVED',
+      'ENDCARD_SHOWN',
+    ])
+    expect(byId(checks, 'dedup')?.ok).toBe(true)
+  })
+
+  it('checks order on first fires only when ENDCARD_SHOWN repeats', () => {
+    const checks = validateAxonSequence([
+      'DISPLAYED',
+      'CHALLENGE_STARTED',
+      'CHALLENGE_SOLVED',
+      'ENDCARD_SHOWN',
+      'CHALLENGE_SOLVED',
+      'ENDCARD_SHOWN',
+    ])
+    expect(byId(checks, 'dedup')?.ok).toBe(true)
+    expect(byId(checks, 'order')?.ok).toBe(true)
+    expect(byId(checks, 'all_conformant')?.ok).toBe(true)
+  })
+
   it('flags CHALLENGE_STARTED firing more than once (first click only)', () => {
     const checks = validateAxonSequence([
       'DISPLAYED',

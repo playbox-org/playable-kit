@@ -96,7 +96,7 @@ and adds the checks a static scan can't make, plus an aggregate roll-up:
 |-------|-------|------|
 | `all_conformant` | error/warn | Aggregate headline — ok iff every other check passes |
 | `order` | warn | First-fire of each event respects the lifecycle order (pairwise, retry-safe). Includes `CHALLENGE_PASS_25` → `_50` → `_75`, `CHALLENGE_FAILED` before `CHALLENGE_RETRY`, `CHALLENGE_SOLVED` before `ENDCARD_SHOWN`, and `CTA_CLICKED` only after `DISPLAYED` (any time — *not* tied to `ENDCARD_SHOWN`). `CHALLENGE_STARTED` first is **not** an order warning — it's the error-level `challenge_requires_started` |
-| `dedup` | warn | The spec marks every event "Deduped?: Yes": a reporting property (AppLovin collapses repeats), not a rule that the creative sends each event once. The kit flags repeats only for the lifecycle one-shots (`LOADING`/`LOADED`/`DISPLAYED`/`ENDCARD_SHOWN`) and `CHALLENGE_STARTED`. `CTA_CLICKED` may fire on every CTA click, and the other `CHALLENGE_*` events repeat across retries |
+| `dedup` | warn | The spec marks every event "Deduped?: Yes": a reporting property (AppLovin collapses repeats), not a rule that the creative sends each event once. The kit flags repeats only for the lifecycle one-shots (`LOADING`/`LOADED`/`DISPLAYED`) and `CHALLENGE_STARTED`. `CTA_CLICKED` may fire on every CTA click, `ENDCARD_SHOWN` again on a retry from the end card, and the other `CHALLENGE_*` events across retries |
 | `challenge_spacing` | warn | Any two `CHALLENGE_*` events ≥ 50 ms apart — AppLovin forbids simultaneous dispatch; each must mark a distinct gameplay moment (needs runtime timestamps) |
 
 It also carries all the set-based checks above (computed from the deduped set).
@@ -124,13 +124,15 @@ Axon panel and the Package-tab advisory box.
   plaintext JS, *not* the base64-zipped payload in the final HTML. Failing
   checks become non-fatal `PackageResult.warnings`, shown in the Package panel
   warnings list.
-- **Package panel** (`src/panels/default.ts` + `static/template`): a visible
-  advisory warnings box; also scanned on panel load / build-dir change via the
-  `scan-axon-events` IPC when AppLovin is selected.
+- **Package panel** (Cocos extension: `src/panels/default.ts` +
+  `static/template`): a visible advisory warnings box; also scanned on panel
+  load / build-dir change via the `scan-axon-events` IPC when AppLovin is
+  selected.
 - **Preview validators** — live runtime check: the `ALPlayableAnalytics` mock
   reports each fired event; verdicts mirror `validateAxonSequence` (minus the
-  static-only redefinition check). Two hand-written JS mirrors, **keep in sync**
-  with `src/validation/axon-events.ts`:
-  - Cocos extension: `static/preview/preview.js` (`computeAxonChecks`)
-  - Platform web validator: `apps/tools/public/validator-preview/preview.js`
+  static-only redefinition check). Two copies, **keep in sync** with
+  `src/validation/axon-events.ts`:
+  - playbox-platform: `packages/playable-preview-harness/axon.ts`
+    (`computeAxonChecks`), used by the client cabinet and the Tools validator
+  - plbx-cocos-assistant (Cocos extension): `static/preview/preview.js`
     (`computeAxonChecks`)

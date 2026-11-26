@@ -270,7 +270,7 @@ const ORDER_PAIRS: ReadonlyArray<readonly [string, string]> = [
   ['CHALLENGE_PASS_50', 'CHALLENGE_PASS_75'],
   ['DISPLAYED', 'ENDCARD_SHOWN'],
   ['DISPLAYED', 'CTA_CLICKED'],
-  // The challenge must resolve before the end card is shown.
+  // The challenge must resolve before the last end card is shown.
   ['CHALLENGE_SOLVED', 'ENDCARD_SHOWN'],
 ]
 
@@ -340,12 +340,15 @@ export function validateAxonSequence(
   }
 
   // Lifecycle order (pairwise, first-occurrence).
-  const orderViolations = ORDER_PAIRS.filter(
-    ([a, b]) =>
-      firstIdx[a] !== undefined &&
-      firstIdx[b] !== undefined &&
-      firstIdx[a] > firstIdx[b],
-  ).map(([a, b]) => `${a} should precede ${b}`)
+  const orderViolations = ORDER_PAIRS.filter(([a, b]) => {
+    if (firstIdx[a] === undefined || firstIdx[b] === undefined) return false
+    // A fail end card before a retry is fine: SOLVED must precede only the last one.
+    const bIdx =
+      a === 'CHALLENGE_SOLVED' && b === 'ENDCARD_SHOWN'
+        ? sequence.lastIndexOf(b)
+        : firstIdx[b]
+    return firstIdx[a] > bIdx
+  }).map(([a, b]) => `${a} should precede ${b}`)
   checks.push({
     id: 'order',
     label: 'Events fired in lifecycle order',

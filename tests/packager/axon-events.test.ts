@@ -345,7 +345,18 @@ describe('validateAxonSequence', () => {
       'CHALLENGE_SOLVED',
     ])
     expect(byId(checks, 'order')?.ok).toBe(false)
-    expect(byId(checks, 'order')?.detail).toContain('ENDCARD_SHOWN')
+    expect(byId(checks, 'order')?.detail).toContain(
+      'CHALLENGE_SOLVED should precede ENDCARD_SHOWN',
+    )
+  })
+
+  it('passes order when CHALLENGE_SOLVED fires and no end card is shown', () => {
+    const checks = validateAxonSequence([
+      'DISPLAYED',
+      'CHALLENGE_STARTED',
+      'CHALLENGE_SOLVED',
+    ])
+    expect(byId(checks, 'order')?.ok).toBe(true)
   })
 
   it('accepts CHALLENGE_SOLVED firing before ENDCARD_SHOWN', () => {
@@ -385,7 +396,7 @@ describe('validateAxonSequence', () => {
     expect(byId(checks, 'dedup')?.detail).not.toContain('CTA_CLICKED')
   })
 
-  it('lets ENDCARD_SHOWN repeat on a retry from the end card', () => {
+  it('accepts a fail end card before a retry (SOLVED precedes the last end card)', () => {
     const checks = validateAxonSequence([
       'DISPLAYED',
       'CHALLENGE_STARTED',
@@ -395,10 +406,12 @@ describe('validateAxonSequence', () => {
       'CHALLENGE_SOLVED',
       'ENDCARD_SHOWN',
     ])
+    expect(byId(checks, 'order')?.ok).toBe(true)
     expect(byId(checks, 'dedup')?.ok).toBe(true)
+    expect(byId(checks, 'all_conformant')?.ok).toBe(true)
   })
 
-  it('checks order on first fires only when ENDCARD_SHOWN repeats', () => {
+  it('passes order when ENDCARD_SHOWN repeats after CHALLENGE_SOLVED', () => {
     const checks = validateAxonSequence([
       'DISPLAYED',
       'CHALLENGE_STARTED',

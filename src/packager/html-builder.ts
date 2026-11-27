@@ -2,6 +2,8 @@ import * as cheerio from 'cheerio'
 import type { CheerioAPI } from 'cheerio'
 import CleanCSS from 'clean-css'
 
+const IMPORT_META = /(?<![\w$.])import\.meta(?![\w$])/g
+
 export class HtmlBuilder {
   private $: cheerio.CheerioAPI
 
@@ -146,6 +148,8 @@ export class HtmlBuilder {
       if (isModule) $el.removeAttr('type')
       $el.removeAttr('crossorigin')
       if ($el.attr('src')) return
+      // import.meta is a SyntaxError in a classic script; an inline module's import.meta.url is the document URL.
+      if (isModule) $el.html(($el.html() || '').replace(IMPORT_META, '({url:document.baseURI})'))
       if (isModule && !moduleScript) moduleScript = $el
       const len = ($el.html() || '').length
       if (len > longestLen) {

@@ -222,5 +222,22 @@ describe('HtmlBuilder', () => {
       expect(html.split('window.plbx_html = {}').length).toBe(2)
       expect(html.split('window.__bundle=1').length).toBe(2)
     })
+
+    it('toClassicBundle turns import.meta in the bundle into the document URL, which a classic script can parse', () => {
+      const bundle =
+        'function s(e){return import.meta.resolve?new URL(import.meta.resolve(e)):new URL(e,import.meta.url)}' +
+        'window.__asset=s("a.png").href;var o={meta:1};window.__prop=o.meta;'
+      const b = new HtmlBuilder(
+        `<html><head><script type="module">${bundle}</script></head><body></body></html>`,
+      )
+      b.toClassicBundle()
+      const script = /<script>([\s\S]*)<\/script>/.exec(b.toHtml())![1]!
+      expect(script).not.toContain('import.meta')
+      const document = { baseURI: 'file:///game/index.html' }
+      const window: Record<string, unknown> = {}
+      new Function('document', 'window', script)(document, window)
+      expect(window.__asset).toBe('file:///game/a.png')
+      expect(window.__prop).toBe(1)
+    })
   })
 })

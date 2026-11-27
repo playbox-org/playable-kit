@@ -231,7 +231,8 @@ describe('HtmlBuilder', () => {
         `<html><head><script type="module">${bundle}</script></head><body></body></html>`,
       )
       b.toClassicBundle()
-      const script = /<script>([\s\S]*)<\/script>/.exec(b.toHtml())![1]!
+      const html = b.toHtml()
+      const script = html.slice(html.indexOf('<script>') + 8, html.indexOf('</script>'))
       expect(script).not.toContain('import.meta')
       const document = { baseURI: 'file:///game/index.html' }
       const window: Record<string, unknown> = {}
